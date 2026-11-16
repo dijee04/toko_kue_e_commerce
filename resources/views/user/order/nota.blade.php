@@ -17,6 +17,7 @@
         }
         .btn-print { background: #6d4c41; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; float: right; }
     </style>
+    @include('partials.favicon')
 </head>
 <body>
     <button class="btn-print" onclick="window.print()">Cetak Nota</button>

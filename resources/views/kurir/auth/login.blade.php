@@ -177,6 +177,7 @@
             color: var(--primary);
         }
     </style>
+    @include('partials.favicon')
 </head>
 <body>
 

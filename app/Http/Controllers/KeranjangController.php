@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Keranjang;
+use App\Models\Produk;
 use Illuminate\Support\Facades\Auth;
 
 class KeranjangController extends Controller
@@ -27,8 +28,25 @@ class KeranjangController extends Controller
             'produk_id' => 'required|exists:produks,id',
             'jumlah' => 'required|integer|min:1',
             'opsi' => 'nullable|array',
-            'total_harga' => 'required|integer'
+            // total_harga dari browser dipercaya tidak: hitung ulang dari database.
+            'total_harga' => 'nullable|integer|min:0'
         ]);
+
+        $produk = Produk::where('is_active', true)->where('harga', '>', 0)->find($request->produk_id);
+        if (!$produk) {
+            return response()->json(['error' => 'Produk tidak tersedia untuk dipesan'], 422);
+        }
+
+        // Total dihitung dari harga server + biaya opsi, bukan dari browser
+        // (antisipasi price tampering lewat payload).
+        $opsi = is_array($request->opsi) ? $request->opsi : [];
+        $unitPrice = \App\Support\ProdukOptions::unitPrice($produk, $opsi);
+
+        if ($unitPrice === null) {
+            return response()->json(['error' => 'Opsi produk tidak valid'], 422);
+        }
+
+        $serverTotal = $unitPrice * (int) $request->jumlah;
 
         // Cari apakah produk dengan opsi yang sama sudah ada di keranjang
         $keranjang = Keranjang::where('user_id', Auth::id())
@@ -42,7 +60,7 @@ class KeranjangController extends Controller
 
         if ($keranjang) {
             $keranjang->jumlah += $request->jumlah;
-            $keranjang->total_harga += $request->total_harga;
+            $keranjang->total_harga += $serverTotal;
             $keranjang->save();
         } else {
             $keranjang = Keranjang::create([
@@ -50,7 +68,7 @@ class KeranjangController extends Controller
                 'produk_id' => $request->produk_id,
                 'jumlah' => $request->jumlah,
                 'opsi' => $request->opsi,
-                'total_harga' => $request->total_harga
+                'total_harga' => $serverTotal
             ]);
         }
 
@@ -65,15 +83,27 @@ class KeranjangController extends Controller
 
         $request->validate([
             'jumlah' => 'required|integer|min:1',
-            'total_harga' => 'required|integer'
         ]);
 
-        $keranjang = Keranjang::where('user_id', Auth::id())->findOrFail($id);
+        $keranjang = Keranjang::with('produk')->where('user_id', Auth::id())->findOrFail($id);
+
+        // Harga dihitung server supaya total tidak bisa dimanipulasi dari browser.
+        $produk = $keranjang->produk;
+        $opsi = is_array($keranjang->opsi) ? $keranjang->opsi : [];
+        $unitPrice = $produk
+            ? \App\Support\ProdukOptions::unitPrice($produk, $opsi)
+            : 0;
+
+        if ($unitPrice === null) {
+            // Opsi tak dikenal/legacy → pakai harga dasar agar tidak jadi 0.
+            $unitPrice = (int) ($produk->harga ?? 0);
+        }
+
         $keranjang->jumlah = $request->jumlah;
-        $keranjang->total_harga = $request->total_harga;
+        $keranjang->total_harga = (int) $unitPrice * (int) $request->jumlah;
         $keranjang->save();
 
-        return response()->json(['success' => true]);
+        return response()->json(['success' => true, 'data' => $keranjang]);
     }
 
     public function destroy($id)

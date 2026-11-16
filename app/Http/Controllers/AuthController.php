@@ -20,7 +20,10 @@ class AuthController extends Controller
     // proses login
     public function login(Request $request)
     {
-        $credentials = $request->only('email', 'password');
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
 
         $user = User::where('email', $credentials['email'])->first();
 
@@ -44,9 +47,15 @@ class AuthController extends Controller
     }
 
     // logout
-    public function logout()
+    public function logout(Request $request)
     {
-        Auth::logout();
+        // Logout dari semua guard agar sesi admin/kurir/user tidak tertinggal.
+        Auth::guard('web')->logout();
+        Auth::guard('admin')->logout();
+        Auth::guard('kurir')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
         return redirect('/login');
     }
     // tampil halaman registrasi
@@ -61,7 +70,7 @@ class AuthController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:4|confirmed',
+            'password' => 'required|string|min:8|confirmed',
         ]);
 
         $user = User::create([

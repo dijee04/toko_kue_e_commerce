@@ -199,7 +199,8 @@
                 background-color: #f3f4f6;
             }
         </style>
-    </head>
+        @include('partials.favicon')
+</head>
     <body>
         <!-- Navbar -->
         <nav class="navbar">
@@ -211,7 +212,6 @@
                 <a href="{{ url('/') }}">Home</a>
                 <a href="{{ url('/menu') }}">Menu</a>
                 <a href="#">Our Story</a>
-                <a href="#">Katering</a>
                 <a href="#" class="btn-pesan-nav">Pesan Sekarang</a>
             </div>
             <div class="social-icons">

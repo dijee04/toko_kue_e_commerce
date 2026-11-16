@@ -5,6 +5,8 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
+use App\Models\Produk;
+use App\Models\Review;
 
 class UserOrderController extends Controller
 {
@@ -21,32 +23,34 @@ class UserOrderController extends Controller
 
     public function index()
     {
-        // Pesanan Aktif: status baru, disiapkan, dikirim, ATAU selesai tapi belum diulas
-        $active_orders = Order::where('user_id', auth()->id())
-            ->where(function($query) {
-                $query->whereIn('status', ['baru', 'disiapkan', 'dikirim'])
-                      ->orWhere(function($q) {
-                          $q->where('status', 'selesai')
-                            ->doesntHave('reviews');
-                      });
-            })
-            ->with(['items.produk', 'reviews'])
+        $orders = Order::where('user_id', auth()->id())
+            ->with(['items.produk', 'reviews.produk'])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Riwayat Pembelian: status dibatalkan, ATAU selesai yang sudah diulas
-        $completed_orders = Order::where('user_id', auth()->id())
-            ->where(function($query) {
-                $query->where('status', 'dibatalkan')
-                      ->orWhere(function($q) {
-                          $q->where('status', 'selesai')
-                            ->has('reviews');
-                      });
-            })
-            ->with(['items.produk', 'reviews'])
-            ->orderBy('created_at', 'desc')
-            ->get();
-            
+        // Sebuah order masih butuh ulasan jika sudah selesai tetapi
+        // ada produk di dalamnya yang belum diulas.
+        $needsReview = function (Order $order) {
+            if ($order->status !== 'selesai') {
+                return false;
+            }
+
+            $reviewedProductIds = $order->reviews->pluck('produk_id')->filter()->unique();
+            $orderedProductIds = $order->items->pluck('produk_id')->unique();
+
+            return $orderedProductIds->diff($reviewedProductIds)->isNotEmpty();
+        };
+
+        $active_orders = $orders->filter(function (Order $order) use ($needsReview) {
+            return in_array($order->status, ['baru', 'disiapkan', 'menunggu_kurir', 'dikirim'], true)
+                || $needsReview($order);
+        })->values();
+
+        $completed_orders = $orders->filter(function (Order $order) use ($needsReview) {
+            return $order->status === 'dibatalkan'
+                || ($order->status === 'selesai' && !$needsReview($order));
+        })->values();
+
         return view('user.pesanan_saya', compact('active_orders', 'completed_orders'));
     }
 
@@ -68,6 +72,8 @@ class UserOrderController extends Controller
         $order->update([
             'status' => 'selesai'
         ]);
+
+        $order->refresh();
 
         return redirect()->route('pesanan_saya', ['tab' => 'aktif'])->with('success', 'Pesanan telah diselesaikan! Silakan berikan ulasan Anda di bawah.');
     }
@@ -92,13 +98,23 @@ class UserOrderController extends Controller
         return view('user.order.nota', compact('order'));
     }
 
-    public function storeReview(Request $request, Order $order)
+    public function storeReview(Request $request, Order $order, Produk $produk)
     {
-        if ($order->user_id !== auth()->id() || $order->status !== 'selesai') {
+        if ((int) $order->user_id !== (int) auth()->id() || $order->status !== 'selesai') {
             abort(403);
         }
 
-        $request->validate([
+        // Produk yang diulas harus benar-benar ada di pesanan ini.
+        if (!$order->items()->where('produk_id', $produk->id)->exists()) {
+            abort(404, 'Produk tidak ditemukan pada pesanan ini.');
+        }
+
+        // Satu produk hanya boleh diulas sekali per pesanan.
+        if ($order->reviews()->where('produk_id', $produk->id)->exists()) {
+            return back()->with('error', 'Produk ini sudah pernah Anda ulas untuk pesanan ini.');
+        }
+
+        $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'ulasan' => 'nullable|string',
             'foto' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048'
@@ -107,23 +123,34 @@ class UserOrderController extends Controller
         $fotoPath = null;
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
-            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $filename = $file->hashName();
             if (!file_exists(public_path('uploads/reviews'))) {
-                mkdir(public_path('uploads/reviews'), 0777, true);
+                mkdir(public_path('uploads/reviews'), 0755, true);
             }
             $file->move(public_path('uploads/reviews'), $filename);
             $fotoPath = 'uploads/reviews/' . $filename;
         }
 
-        \App\Models\Review::create([
+        Review::create([
             'user_id' => auth()->id(),
             'order_id' => $order->id,
-            'rating' => $request->rating,
-            'ulasan' => $request->ulasan,
+            'produk_id' => $produk->id,
+            'rating' => $validated['rating'],
+            'ulasan' => $validated['ulasan'] ?? null,
             'foto' => $fotoPath
         ]);
 
-        return redirect()->route('pesanan_saya', ['tab' => 'riwayat'])->with('success', 'Terima kasih atas ulasan Anda!');
+        // Jaga kolom rating_avg produk tetap sinkron dengan ulasan asli.
+        $produk->update([
+            'rating_avg' => round((float) Review::where('produk_id', $produk->id)->avg('rating'), 2),
+        ]);
+
+        $reviewedProductIds = Review::where('order_id', $order->id)->pluck('produk_id');
+        $hasRemaining = $order->items()->whereNotIn('produk_id', $reviewedProductIds)->exists();
+
+        return redirect()
+            ->route('pesanan_saya', ['tab' => $hasRemaining ? 'aktif' : 'riwayat'])
+            ->with('success', 'Terima kasih atas ulasan Anda!');
     }
 
     public function cancelOrder(Order $order)
@@ -141,6 +168,8 @@ class UserOrderController extends Controller
             'status' => 'dibatalkan',
             'payment_status' => 'failed'
         ]);
+
+        $order->refresh();
 
         return redirect()->route('pesanan_saya', ['tab' => 'riwayat'])->with('success', 'Pesanan Anda telah berhasil dibatalkan.');
     }

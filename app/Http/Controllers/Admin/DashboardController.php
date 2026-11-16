@@ -14,7 +14,7 @@ class DashboardController extends Controller
     {
         $totalProduk = Produk::count();
         $pesananBaru = Order::where('status', 'baru')->count();
-        $pendapatan = Order::where('status', 'selesai')->sum('total_harga');
+        $pendapatan = Order::where('status', 'selesai')->where('payment_status', 'paid')->sum('total_harga');
 
         return view('admin.dashboard', compact('totalProduk', 'pesananBaru', 'pendapatan'));
     }

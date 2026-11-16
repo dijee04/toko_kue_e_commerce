@@ -32,6 +32,26 @@
                     <td style="padding: 8px 0; font-weight: 600; line-height: 1.5;">: {{ $order->alamat }}</td>
                 </tr>
             </table>
+
+            @php
+                $mapLat = $order->latitude ?? optional($order->user)->latitude;
+                $mapLng = $order->longitude ?? optional($order->user)->longitude;
+            @endphp
+            <div style="margin-top: 16px;">
+                <div style="color: var(--text-muted); font-weight: 700; font-size: 13px; margin-bottom: 8px;">
+                    <i class="fas fa-map-marked-alt"></i> Titik Koordinat Maps
+                </div>
+                @if($mapLat !== null && $mapLng !== null)
+                    <div id="adminOrderMap" style="height: 240px; border-radius: 12px; border: 1px solid #eee; position: relative; z-index: 0; isolation: isolate;"></div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                        Lat: {{ number_format((float) $mapLat, 6) }}, Lng: {{ number_format((float) $mapLng, 6) }}
+                    </div>
+                @else
+                    <div style="background: #fafafa; border: 1px dashed #ddd; border-radius: 12px; padding: 16px; color: var(--text-muted); font-size: 13px;">
+                        Pelanggan belum menentukan titik koordinat lokasi.
+                    </div>
+                @endif
+            </div>
         </div>
 
         <div class="card" style="border-top: 4px solid var(--info);">
@@ -89,23 +109,38 @@
         <h3 style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
             <i class="fas fa-edit" style="color: var(--primary-light);"></i> Ubah Status Pesanan
         </h3>
+        @php
+            $allowedStatuses = $order->adminAllowedStatuses();
+
+            // Admin tetap boleh memperbarui ongkir selama pesanan belum diambil kurir.
+            if ($order->status === 'menunggu_kurir' && $order->kurir_id === null) {
+                $allowedStatuses = array_merge(['menunggu_kurir'], $allowedStatuses);
+            }
+        @endphp
+
+        @if(empty($allowedStatuses))
+            <div style="padding: 14px 18px; background: #f5f5f5; border-radius: 10px; color: #616161; font-weight: 600; display: flex; align-items: center; gap: 10px; border: 1px solid #e0e0e0;">
+                <i class="fas fa-lock" style="color: #9e9e9e;"></i>
+                Status <strong>{{ $order->statusLabel() }}</strong> dikelola otomatis oleh kurir atau sudah final, jadi tidak bisa diubah dari sini.
+            </div>
+        @else
         <form action="{{ route('admin.order.update_status', $order->id) }}" method="POST" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
             @csrf
             @method('PATCH')
             <div>
                 <label style="font-size:13px; font-weight:700; color:#777; display:block; margin-bottom:5px;">Status</label>
-                <select name="status" id="statusSelect" onchange="toggleOngkirField(this.value)" class="form-control" style="max-width: 220px; height: 40px; border-radius: 8px; font-weight: 600;">
-                    <option value="baru"           {{ $order->status == 'baru'           ? 'selected' : '' }}>Baru</option>
-                    <option value="disiapkan"      {{ $order->status == 'disiapkan'      ? 'selected' : '' }}>Disiapkan</option>
-                    <option value="menunggu_kurir" {{ $order->status == 'menunggu_kurir' ? 'selected' : '' }}>Menunggu Kurir</option>
-                    <option value="dikirim"        {{ $order->status == 'dikirim'        ? 'selected' : '' }}>Dikirim</option>
-                    <option value="selesai"        {{ $order->status == 'selesai'        ? 'selected' : '' }}>Selesai</option>
-                    <option value="dibatalkan"     {{ $order->status == 'dibatalkan'     ? 'selected' : '' }}>Dibatalkan</option>
+                <select name="status" id="statusSelect" required onchange="toggleOngkirField(this.value)" class="form-control" style="max-width: 260px; height: 40px; border-radius: 8px; font-weight: 600;">
+                    <option value="" selected disabled>Pilih status berikutnya...</option>
+                    @foreach($allowedStatuses as $status)
+                        <option value="{{ $status }}" {{ old('status') === $status ? 'selected' : '' }}>
+                            {{ \App\Models\Order::statusLabelFor($status) }}{{ $status === $order->status ? ' (perbarui ongkir)' : '' }}
+                        </option>
+                    @endforeach
                 </select>
             </div>
 
             {{-- Ongkir input: tampil hanya saat pilih "menunggu_kurir" --}}
-            <div id="ongkirField" style="display: {{ $order->status == 'menunggu_kurir' ? 'block' : 'none' }};">
+            <div id="ongkirField" style="display: none;">
                 <label style="font-size:13px; font-weight:700; color:#777; display:block; margin-bottom:5px;">
                     <i class="fas fa-motorcycle" style="color:#f06292;"></i> Ongkos Kirim (Rp)
                 </label>
@@ -124,6 +159,31 @@
                 <i class="fas fa-save"></i> Simpan Status
             </button>
         </form>
+        @endif
+
+        {{-- Update Pembayaran Card --}}
+        <div class="card" style="border-top: 4px solid var(--info); margin-top: 20px;">
+            <h3 style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-money-check" style="color: var(--info);"></i> Ubah Status Pembayaran
+            </h3>
+            <form action="{{ route('admin.order.update_status', $order->id) }}" method="POST" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                @csrf
+                @method('PATCH')
+                <input type="hidden" name="status" value="{{ $order->status }}">
+                <div>
+                    <label style="font-size:13px; font-weight:700; color:#777; display:block; margin-bottom:5px;">Status Pembayaran</label>
+                    <select name="payment_status" id="paymentStatusSelect" required class="form-control" style="max-width: 260px; height: 40px; border-radius: 8px; font-weight: 600;">
+                        <option value="unpaid" {{ $order->payment_status === 'unpaid' ? 'selected' : '' }}>Belum Dibayar</option>
+                        <option value="paid" {{ $order->payment_status === 'paid' ? 'selected' : '' }}>Lunas / Sudah Dibayar</option>
+                        <option value="failed" {{ $order->payment_status === 'failed' ? 'selected' : '' }}>Gagal</option>
+                        <option value="expired" {{ $order->payment_status === 'expired' ? 'selected' : '' }}>Kedaluwarsa</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn" style="background: var(--info); color: white; height: 40px; padding: 0 20px; border-radius: 8px; font-weight: 700;">
+                    <i class="fas fa-save"></i> Simpan Pembayaran
+                </button>
+            </form>
+        </div>
 
         @if($order->ongkir)
         <div style="margin-top: 15px; padding: 12px 18px; background: #e8f5e9; border-radius: 10px; display: flex; align-items: center; gap: 10px; border: 1px solid #c8e6c9;">
@@ -144,6 +204,8 @@
         function toggleOngkirField(status) {
             const field = document.getElementById('ongkirField');
             const input = document.getElementById('ongkirInput');
+            if (!field || !input) return;
+
             if (status === 'menunggu_kurir') {
                 field.style.display = 'block';
                 input.required = true;
@@ -152,8 +214,11 @@
                 input.required = false;
             }
         }
-        // Run on page load
-        toggleOngkirField(document.getElementById('statusSelect').value);
+        // Run on page load (hanya jika form status tersedia)
+        const statusSelect = document.getElementById('statusSelect');
+        if (statusSelect) {
+            toggleOngkirField(statusSelect.value);
+        }
     </script>
 
     <div class="card">
@@ -226,6 +291,9 @@
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <strong style="color: #5c3a21; font-size: 16.5px;">{{ $review->user->name ?? 'Pelanggan Setia' }}</strong>
+                        <div style="font-size: 13px; color: #8d6e63; font-weight: 700; margin-top: 4px;">
+                            Produk: {{ $review->produk->nama_produk ?? 'Produk' }}
+                        </div>
                         <div style="color: #ffb300; font-size: 14px; margin-top: 5px;">
                             @for($i=1; $i<=5; $i++)
                                 <i class="fas fa-star" style="color: {{ $i <= $review->rating ? '#ffb300' : '#e0e0e0' }}; font-size: 15px;"></i>
@@ -254,6 +322,24 @@
         </div>
         @endforeach
     </div>
+    @endif
+
+    @if($mapLat !== null && $mapLng !== null)
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var el = document.getElementById('adminOrderMap');
+        if (!el) return;
+        var lat = {{ (float) $mapLat }};
+        var lng = {{ (float) $mapLng }};
+        var map = L.map('adminOrderMap').setView([lat, lng], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+        L.marker([lat, lng]).addTo(map).bindPopup('Tujuan Pengantaran');
+    });
+    </script>
     @endif
 @endsection
 

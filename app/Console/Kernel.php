@@ -12,7 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Batalkan otomatis pesanan baru yang belum dibayar setiap 24 jam
+        $schedule->command('orders:cancel-unpaid --hours=24')->daily();
     }
 
     /**

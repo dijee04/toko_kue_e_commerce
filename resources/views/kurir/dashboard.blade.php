@@ -500,6 +500,7 @@
             margin-top: auto;
         }
     </style>
+    @include('partials.favicon')
 </head>
 <body>
 

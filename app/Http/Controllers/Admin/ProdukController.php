@@ -12,7 +12,7 @@ class ProdukController extends Controller
 {
     public function index()
     {
-        $produks = Produk::with('kategori')->latest()->get();
+        $produks = Produk::with('kategori')->latest()->paginate(15);
         return view('admin.produk.index', compact('produks'));
     }
 
@@ -24,19 +24,19 @@ class ProdukController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'nama_produk' => 'required|string|max:255',
             'deskripsi' => 'nullable|string',
-            'harga' => 'required|numeric',
+            'harga' => 'required|numeric|min:0',
             'kategori_id' => 'required|exists:kategoris,id',
-            'gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048'
         ]);
 
-        $data = $request->all();
+        $data = $validated;
+        unset($data['gambar']);
 
         if ($request->hasFile('gambar')) {
-            $path = $request->file('gambar')->store('produk', 'public');
-            $data['gambar'] = $path;
+            $data['gambar'] = $request->file('gambar')->store('produk', 'public');
         }
 
         Produk::create($data);
@@ -52,23 +52,23 @@ class ProdukController extends Controller
 
     public function update(Request $request, Produk $produk)
     {
-        $request->validate([
+        $validated = $request->validate([
             'nama_produk' => 'required|string|max:255',
             'deskripsi' => 'nullable|string',
-            'harga' => 'required|numeric',
+            'harga' => 'required|numeric|min:0',
             'kategori_id' => 'required|exists:kategoris,id',
-            'gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048'
         ]);
 
-        $data = $request->all();
+        $data = $validated;
+        unset($data['gambar']);
 
         if ($request->hasFile('gambar')) {
             // Hapus gambar lama jika ada
             if ($produk->gambar && Storage::disk('public')->exists($produk->gambar)) {
                 Storage::disk('public')->delete($produk->gambar);
             }
-            $path = $request->file('gambar')->store('produk', 'public');
-            $data['gambar'] = $path;
+            $data['gambar'] = $request->file('gambar')->store('produk', 'public');
         }
 
         $produk->update($data);
@@ -78,6 +78,10 @@ class ProdukController extends Controller
 
     public function destroy(Produk $produk)
     {
+        if (\App\Models\OrderItem::where('produk_id', $produk->id)->exists()) {
+            return back()->with('error', 'Produk tidak dapat dihapus karena sudah pernah dipesan (riwayat pesanan harus dijaga).');
+        }
+
         if ($produk->gambar && Storage::disk('public')->exists($produk->gambar)) {
             Storage::disk('public')->delete($produk->gambar);
         }

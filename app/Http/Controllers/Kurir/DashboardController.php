@@ -42,15 +42,22 @@ class DashboardController extends Controller
 
     public function acceptOrder(Request $request, Order $order)
     {
-        if ($order->status !== 'menunggu_kurir') {
+        // Update atomik: cegah dua kurir menerima pesanan yang sama.
+        $updated = Order::where('id', $order->id)
+            ->where('status', 'menunggu_kurir')
+            ->whereNull('kurir_id')
+            ->update([
+                'status' => 'dikirim',
+                'kurir_id' => auth()->guard('kurir')->id(),
+                'updated_at' => now(),
+            ]);
+
+        if (!$updated) {
             return redirect()->route('kurir.orders.pending')->with('error', 'Pesanan sudah diambil kurir lain atau tidak valid.');
         }
-        
-        $order->update([
-            'status' => 'dikirim',
-            'kurir_id' => auth()->guard('kurir')->id()
-        ]);
-        
+
+        $order->refresh();
+
         return redirect()->route('kurir.dashboard')->with('success', 'Berhasil menerima pesanan! Silakan selesaikan pengantaran.');
     }
 
@@ -59,6 +66,11 @@ class DashboardController extends Controller
      */
     public function completeDelivery(Request $request, Order $order)
     {
+        // Pastikan hanya kurir yang ditugaskan yang boleh menyelesaikan order ini.
+        if ((int) $order->kurir_id !== (int) auth()->guard('kurir')->id()) {
+            abort(403, 'Anda tidak berhak menyelesaikan pesanan ini.');
+        }
+
         if ($order->status !== 'dikirim') {
             return back()->with('error', 'Pesanan ini tidak sedang dalam pengiriman.');
         }
@@ -73,7 +85,7 @@ class DashboardController extends Controller
 
             $destinationPath = public_path('uploads/bukti_pengiriman');
             if (!File::exists($destinationPath)) {
-                File::makeDirectory($destinationPath, 0777, true, true);
+                File::makeDirectory($destinationPath, 0755, true, true);
             }
 
             $file->move($destinationPath, $filename);
@@ -83,6 +95,8 @@ class DashboardController extends Controller
                 'status' => 'selesai',
                 'bukti_pengiriman' => $fotoPath,
             ]);
+
+            $order->refresh();
 
             return back()->with('success', 'Pesanan #' . $order->id . ' berhasil diselesaikan dan bukti pengiriman telah diunggah!');
         }

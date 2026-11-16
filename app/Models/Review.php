@@ -9,7 +9,7 @@ class Review extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'order_id', 'rating', 'ulasan', 'foto'];
+    protected $fillable = ['user_id', 'order_id', 'produk_id', 'rating', 'ulasan', 'foto'];
 
     public function user()
     {
@@ -19,5 +19,10 @@ class Review extends Model
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function produk()
+    {
+        return $this->belongsTo(Produk::class);
     }
 }

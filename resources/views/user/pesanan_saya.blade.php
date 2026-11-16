@@ -54,9 +54,9 @@
                 <a href="{{ route('menu') }}" class="btn-pesan" style="background: linear-gradient(135deg, #f06292, #ec407a); color: white; padding: 12px 30px; border-radius: 50px; text-decoration: none; font-weight: 800; display: inline-block;">Lihat Menu</a>
             </div>
         @else
-            <div style="display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 20px;" class="stagger scroll-reveal">
                 @foreach($active_orders as $order)
-                    <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 25px rgba(0,0,0,0.06); border: 1px solid #fce4ec;">
+                    <div class="order-card hover-lift" style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 25px rgba(0,0,0,0.06); border: 1px solid #fce4ec;">
                         <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #f5f5f5; padding-bottom: 15px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                             <div>
                                 <div style="font-size: 13px; color: #999; margin-bottom: 5px;">Tanggal Pesanan</div>
@@ -232,41 +232,74 @@
                                     </div>
                                 @endif
 
-                                @if($order->reviews->isEmpty())
+                                @php
+                                    $reviewsByProduct = $order->reviews->keyBy('produk_id');
+                                    $orderItems = $order->items->unique('produk_id');
+                                @endphp
+                                @if($orderItems->isNotEmpty())
                                     <h4 style="color: #6d4c41; margin-bottom: 15px; font-weight: 800;">Bagikan Pengalaman Anda</h4>
-                                    <form action="{{ route('user.order.review', $order->id) }}" method="POST" enctype="multipart/form-data" onsubmit="sessionStorage.setItem('payment_success_confetti', 'true');">
-                                        @csrf
-                                        <div style="margin-bottom: 15px;">
-                                            <label style="display: block; font-size: 14.5px; color: #6d4c41; margin-bottom: 8px; font-weight: 800;">Berikan Rating Anda:</label>
-                                            <div class="star-rating-selector" data-order-id="{{ $order->id }}" style="display: flex; gap: 10px; font-size: 32px; cursor: pointer; margin-bottom: 12px; user-select: none;">
-                                                <span class="star-item" data-value="1">★</span>
-                                                <span class="star-item" data-value="2">★</span>
-                                                <span class="star-item" data-value="3">★</span>
-                                                <span class="star-item" data-value="4">★</span>
-                                                <span class="star-item" data-value="5">★</span>
-                                            </div>
-                                            <input type="hidden" name="rating" id="ratingInput-{{ $order->id }}" value="5" required>
-                                            <div id="ratingText-{{ $order->id }}" style="font-size: 13.5px; font-weight: 800; color: #ff8f00; margin-top: -5px; margin-bottom: 15px;">⭐⭐⭐⭐⭐ (Sangat Puas)</div>
-                                        </div>
-                                        <div style="margin-bottom: 15px;">
-                                            <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Ulasan (Opsional):</label>
-                                            <textarea name="ulasan" rows="3" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; outline: none; transition: border-color 0.3s;" placeholder="Ceritakan pendapat Anda tentang kue kami..." onfocus="this.style.borderColor='#f06292'" onblur="this.style.borderColor='#ddd'"></textarea>
-                                        </div>
-                                        <div style="margin-bottom: 20px;">
-                                            <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Tambahkan Foto Kue (Opsional):</label>
-                                            <div style="position: relative; display: flex; align-items: center; gap: 15px;">
-                                                <label for="fotoInput-{{ $order->id }}" style="background: #fff; color: #f06292; border: 2px dashed #f8bbd0; padding: 12px 20px; border-radius: 16px; font-weight: 700; font-size: 13.5px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s;" onmouseover="this.style.background='#fdf5f7'; this.style.borderColor='#f06292';" onmouseout="this.style.background='#fff'; this.style.borderColor='#f8bbd0';">
-                                                    📸 Pilih Foto Menarik
-                                                </label>
-                                                <input type="file" name="foto" id="fotoInput-{{ $order->id }}" accept="image/*" style="display: none;" onchange="previewReviewImage(this, '{{ $order->id }}')">
-                                                <div id="previewContainer-{{ $order->id }}" style="display: none; position: relative;">
-                                                    <img id="previewImg-{{ $order->id }}" src="" style="width: 60px; height: 60px; object-fit: cover; border-radius: 12px; border: 2px solid #f06292; box-shadow: 0 4px 10px rgba(240,98,146,0.15);">
-                                                    <button type="button" onclick="removeReviewImage('{{ $order->id }}')" style="position: absolute; top: -8px; right: -8px; background: #e57373; color: white; border: none; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">&times;</button>
+                                    @foreach($orderItems as $item)
+                                        @php
+                                            $review = $reviewsByProduct->get($item->produk_id);
+                                            $reviewKey = $order->id . '-' . $item->produk_id;
+                                        @endphp
+                                        <div style="background: #fffaf7; border: 1px solid #ffe0d0; border-radius: 18px; padding: 20px; margin-bottom: 18px;">
+                                            <div style="font-weight: 800; color: #6d4c41; margin-bottom: 12px;">{{ $item->produk->nama_produk ?? 'Produk' }}</div>
+
+                                            @if($review)
+                                                <div style="background: #fdf5f7; padding: 15px; border-radius: 15px; border: 1px solid rgba(240,98,146,0.1);">
+                                                    <div style="font-weight: 700; color: #6d4c41; margin-bottom: 5px;">Ulasan Anda:</div>
+                                                    <div style="color: #fbc02d; font-size: 16px; margin-bottom: 8px;">
+                                                        @for($i = 0; $i < $review->rating; $i++) ⭐ @endfor
+                                                    </div>
+                                                    <div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
+                                                        @if($review->foto)
+                                                            <a href="{{ asset($review->foto) }}" target="_blank">
+                                                                <img src="{{ asset($review->foto) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                                            </a>
+                                                        @endif
+                                                        <div style="flex: 1; font-style: italic; color: #8d6e63; font-size: 14px; background: white; padding: 10px; border-radius: 8px; border-left: 4px solid #f06292; min-height: 40px; display: flex; align-items: center;">
+                                                            "{{ $review->ulasan ?: 'Anda memberikan rating & foto untuk produk ini.' }}"
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            @else
+                                                <form action="{{ route('user.order.review', [$order->id, $item->produk_id]) }}" method="POST" enctype="multipart/form-data" onsubmit="sessionStorage.setItem('payment_success_confetti', 'true');">
+                                                    @csrf
+                                                    <div style="margin-bottom: 15px;">
+                                                        <label style="display: block; font-size: 14.5px; color: #6d4c41; margin-bottom: 8px; font-weight: 800;">Berikan Rating Anda:</label>
+                                                        <div class="star-rating-selector" data-order-id="{{ $reviewKey }}" style="display: flex; gap: 10px; font-size: 32px; cursor: pointer; margin-bottom: 12px; user-select: none;">
+                                                            <span class="star-item" data-value="1">★</span>
+                                                            <span class="star-item" data-value="2">★</span>
+                                                            <span class="star-item" data-value="3">★</span>
+                                                            <span class="star-item" data-value="4">★</span>
+                                                            <span class="star-item" data-value="5">★</span>
+                                                        </div>
+                                                        <input type="hidden" name="rating" id="ratingInput-{{ $reviewKey }}" value="5" required>
+                                                        <div id="ratingText-{{ $reviewKey }}" style="font-size: 13.5px; font-weight: 800; color: #ff8f00; margin-top: -5px; margin-bottom: 15px;">⭐⭐⭐⭐⭐ (Sangat Puas)</div>
+                                                    </div>
+                                                    <div style="margin-bottom: 15px;">
+                                                        <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Ulasan (Opsional):</label>
+                                                        <textarea name="ulasan" rows="3" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; outline: none; transition: border-color 0.3s;" placeholder="Ceritakan pendapat Anda tentang kue kami..." onfocus="this.style.borderColor='#f06292'" onblur="this.style.borderColor='#ddd'"></textarea>
+                                                    </div>
+                                                    <div style="margin-bottom: 20px;">
+                                                        <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Tambahkan Foto Kue (Opsional):</label>
+                                                        <div style="position: relative; display: flex; align-items: center; gap: 15px;">
+                                                            <label for="fotoInput-{{ $reviewKey }}" style="background: #fff; color: #f06292; border: 2px dashed #f8bbd0; padding: 12px 20px; border-radius: 16px; font-weight: 700; font-size: 13.5px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s;" onmouseover="this.style.background='#fdf5f7'; this.style.borderColor='#f06292';" onmouseout="this.style.background='#fff'; this.style.borderColor='#f8bbd0';">
+                                                                📸 Pilih Foto Menarik
+                                                            </label>
+                                                            <input type="file" name="foto" id="fotoInput-{{ $reviewKey }}" accept="image/*" style="display: none;" onchange="previewReviewImage(this, '{{ $reviewKey }}')">
+                                                            <div id="previewContainer-{{ $reviewKey }}" style="display: none; position: relative;">
+                                                                <img id="previewImg-{{ $reviewKey }}" src="" style="width: 60px; height: 60px; object-fit: cover; border-radius: 12px; border: 2px solid #f06292; box-shadow: 0 4px 10px rgba(240,98,146,0.15);">
+                                                                <button type="button" onclick="removeReviewImage('{{ $reviewKey }}')" style="position: absolute; top: -8px; right: -8px; background: #e57373; color: white; border: none; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">&times;</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <button type="submit" style="background: #f06292; color: white; border: none; padding: 10px 22px; border-radius: 50px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 10px rgba(240,98,146,0.2); transition: all 0.3s;">Kirim Ulasan</button>
+                                                </form>
+                                            @endif
                                         </div>
-                                        <button type="submit" style="background: #f06292; color: white; border: none; padding: 10px 22px; border-radius: 50px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 10px rgba(240,98,146,0.2); transition: all 0.3s;">Kirim Ulasan</button>
-                                    </form>
+                                    @endforeach
                                 @endif
                             </div>
                         @endif
@@ -356,22 +389,24 @@
                                     </div>
                                 @endif
 
-                                <div style="background: #fdf5f7; padding: 15px; border-radius: 15px; border: 1px solid rgba(240,98,146,0.1);">
-                                    <div style="font-weight: 700; color: #6d4c41; margin-bottom: 5px;">Ulasan Anda:</div>
-                                    <div style="color: #fbc02d; font-size: 16px; margin-bottom: 8px;">
-                                        @for($i=0; $i<$order->reviews->first()->rating; $i++) ⭐ @endfor
-                                    </div>
-                                    <div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
-                                        @if($order->reviews->first()->foto)
-                                            <a href="{{ asset($order->reviews->first()->foto) }}" target="_blank">
-                                                <img src="{{ asset($order->reviews->first()->foto) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-                                            </a>
-                                        @endif
-                                        <div style="flex: 1; font-style: italic; color: #8d6e63; font-size: 14px; background: white; padding: 10px; border-radius: 8px; border-left: 4px solid #f06292; min-height: 40px; display: flex; align-items: center;">
-                                            "{{ $order->reviews->first()->ulasan ?: 'Anda memberikan rating & foto untuk pesanan ini.' }}"
+                                @foreach($order->reviews as $review)
+                                    <div style="background: #fdf5f7; padding: 15px; border-radius: 15px; border: 1px solid rgba(240,98,146,0.1); margin-bottom: 15px;">
+                                        <div style="font-weight: 700; color: #6d4c41; margin-bottom: 5px;">{{ $review->produk->nama_produk ?? 'Produk' }}</div>
+                                        <div style="color: #fbc02d; font-size: 16px; margin-bottom: 8px;">
+                                            @for($i = 0; $i < $review->rating; $i++) ⭐ @endfor
+                                        </div>
+                                        <div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
+                                            @if($review->foto)
+                                                <a href="{{ asset($review->foto) }}" target="_blank">
+                                                    <img src="{{ asset($review->foto) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                                </a>
+                                            @endif
+                                            <div style="flex: 1; font-style: italic; color: #8d6e63; font-size: 14px; background: white; padding: 10px; border-radius: 8px; border-left: 4px solid #f06292; min-height: 40px; display: flex; align-items: center;">
+                                                "{{ $review->ulasan ?: 'Anda memberikan rating & foto untuk produk ini.' }}"
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                @endforeach
                             </div>
                         @endif
                     </div>
@@ -545,18 +580,9 @@
 
         window.snap.pay(snapToken, {
             onSuccess: function(result){
-                fetch('{{ route("user.checkout.success_local") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ snap_token: snapToken })
-                }).then(() => {
-                    sessionStorage.setItem('payment_success_confetti', 'true');
-                    alert("Pembayaran berhasil!");
-                    location.reload();
-                });
+                sessionStorage.setItem('payment_success_confetti', 'true');
+                alert("Pembayaran berhasil!");
+                location.reload();
             },
             onPending: function(result){
                 alert("Menunggu pembayaran Anda!");

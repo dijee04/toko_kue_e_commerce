@@ -26,55 +26,26 @@
     </section>
 
     @php
-        // Inisialisasi koleksi produk dari database
-        // Tidak ada inisialisasi hardcode, menggunakan $produks dari controller
+        // Kelompokkan produk aktif berdasarkan kategori aslinya. Urutan tampil
+        // mengikuti daftar preferensi; kategori lain otomatis di belakang.
+        $menuOrder = ['Kue Kering', 'Dessert', 'Kue Ulang Tahun', 'Savoury', 'Snacks', 'Sweet Treats', 'Hampers', 'Kue Basah'];
 
-        // Kategori:Cake
-        $birthdayCakes = collect($produks)->filter(function ($produk) {
-            $kategori = strtolower($produk->kategori->nama_kategori ?? '');
-            $namaProduk = strtolower($produk->nama_produk ?? '');
-            return str_contains($kategori, 'cake')
-                || str_contains($kategori, 'ulang tahun')
-                || str_contains($kategori, 'dessert')
-                || str_contains($namaProduk, 'tart')
-                || str_contains($namaProduk, 'cake')
-                || str_contains($namaProduk, 'puding');
+        $groupedMenus = [];
+        foreach ($produks as $produk) {
+            $namaKategori = $produk->kategori->nama_kategori ?? 'Menu Lain';
+            $groupedMenus[$namaKategori][] = $produk;
+        }
+
+        uksort($groupedMenus, function ($a, $b) use ($menuOrder) {
+            $posA = array_search($a, $menuOrder, true);
+            $posB = array_search($b, $menuOrder, true);
+            return ($posA === false ? 999 : $posA) <=> ($posB === false ? 999 : $posB);
         });
 
-        $cookies = collect($produks)->filter(function ($produk) {
-            $kategori = strtolower($produk->kategori->nama_kategori ?? '');
-            $namaProduk = strtolower($produk->nama_produk ?? '');
-            return str_contains($kategori, 'kering')
-                || str_contains($kategori, 'cookie')
-                || str_contains($namaProduk, 'cookie')
-                || str_contains($namaProduk, 'cookies');
-        });
+        foreach ($groupedMenus as $namaKategori => $items) {
+            $groupedMenus[$namaKategori] = collect($items);
+        }
 
-        $pastries = collect($produks)->filter(function ($produk) {
-            $kategori = strtolower($produk->kategori->nama_kategori ?? '');
-            $namaProduk = strtolower($produk->nama_produk ?? '');
-            return str_contains($kategori, 'basah')
-                || str_contains($kategori, 'pastry')
-                || str_contains($namaProduk, 'brownis')
-                || str_contains($namaProduk, 'cheesecake');
-        });
-
-        $assignedIds = $birthdayCakes->pluck('id')
-            ->merge($cookies->pluck('id'))
-            ->merge($pastries->pluck('id'))
-            ->unique();
-
-        $menuLain = collect($produks)->filter(function ($produk) use ($assignedIds) {
-            return !$assignedIds->contains($produk->id);
-        });
-
-        $groupedMenus = [
-            'Birthday Cake' => $birthdayCakes,
-            'Cookies' => $cookies,
-            'Pastries' => $pastries,
-            'Menu Lain' => $menuLain,
-        ];
-        
         // CEK APAKAH MENU KOSONG
         $isEmptyMenu = true;
         foreach($groupedMenus as $items) {
@@ -111,11 +82,14 @@
                             </div>
                         </div>
 
-                        <div class="menu-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 30px;">
+                        <div class="menu-grid stagger scroll-reveal" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 30px;">
                             @foreach($items as $index => $produk)
                                 @php
                                     if($produk->gambar && !str_starts_with($produk->gambar, 'http')) {
-                                        if (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/')) {
+                                        if (str_starts_with($produk->gambar, 'assets/')) {
+                                            // Path sudah lengkap relatif terhadap public/
+                                            $imageUrl = asset($produk->gambar);
+                                        } elseif (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/')) {
                                             $imageUrl = asset('assets/img_produk/' . ltrim($produk->gambar, '/'));
                                         } else {
                                             $imageUrl = asset('storage/' . $produk->gambar);
@@ -126,21 +100,35 @@
                                         $imageUrl = 'https://picsum.photos/seed/' . $produk->id . '/300/200';
                                     }
                                     
-                                    // Siapkan data variant_images jika ada
-                                    $variantImages = isset($produk->variant_images) ? $produk->variant_images : [];
-                                    
+                                    // Aturan opsi dipusatkan di App\Support\ProdukOptions
+                                    // agar harga yang dihitung server sama dengan yang tampil.
+                                    $isCake = \App\Support\ProdukOptions::isCake($produk);
+                                    $options = \App\Support\ProdukOptions::for($produk);
+
+                                    // Galeri varian (kosmetik): varian pertama pakai gambar
+                                    // produk asli, sisanya ilustrasi.
+                                    $variantImages = $isCake ? [
+                                        'Personal Size 10cm (+0k)' => $imageUrl,
+                                        'Medium Size 16cm (+50k)' => 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&q=80&w=400',
+                                        'Family Size 22cm (+120k)' => 'https://images.unsplash.com/photo-1535141192574-5d4897c13636?auto=format&fit=crop&q=80&w=400',
+                                    ] : [
+                                        'Original Sweet (+0k)' => $imageUrl,
+                                        'Double Choco Premium (+15k)' => 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&q=80&w=400',
+                                        'Matcha Velvet Cream (+20k)' => 'https://images.unsplash.com/photo-1582278619435-75b79e25b118?auto=format&fit=crop&q=80&w=400',
+                                    ];
+
                                     $produkJson = json_encode([
                                         'id' => $produk->id,
                                         'nama_produk' => $produk->nama_produk,
                                         'deskripsi' => $produk->deskripsi,
                                         'harga' => $produk->harga,
-                                        'options' => $produk->options ?? [],
+                                        'options' => $options,
                                         'gambar' => $imageUrl,
                                         'variant_images' => $variantImages
                                     ]);
                                 @endphp
 
-                                <div class="menu-card" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px); border-radius: 28px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.08); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); position: relative; border: 1px solid rgba(255,255,255,0.6); display: flex; flex-direction: column; height: 100%;">
+                                <div class="menu-card hover-lift scroll-reveal" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px); border-radius: 28px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.08); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); position: relative; border: 1px solid rgba(255,255,255,0.6); display: flex; flex-direction: column; height: 100%;">
                                     <!-- Efek glow saat hover -->
                                     <div class="card-glow" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle at 50% 0%, rgba(240,98,146,0.15), transparent 70%); opacity: 0; transition: opacity 0.5s; pointer-events: none; z-index: 1;"></div>
                                     
@@ -148,9 +136,11 @@
                                         <div style="position: relative; overflow: hidden; height: 100%; background: linear-gradient(135deg, #fce4ec, #f8bbd0);">
                                             <img src="{{ $imageUrl }}" alt="{{ $produk->nama_produk }}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);" onerror="this.src='https://picsum.photos/300/200'">
                                             <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(240,98,146,0.2), rgba(236,64,122,0.2)); opacity: 0; transition: opacity 0.5s;"></div>
+                                            @if($produk->is_promo)
                                             <div class="discount-badge" style="position: absolute; top: 15px; right: 15px; background: linear-gradient(135deg, #f06292, #ec407a); color: white; padding: 6px 14px; border-radius: 40px; font-size: 11px; font-weight: 800; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 2;">
                                                 🔥 Best Seller
                                             </div>
+                                            @endif
                                             <div class="quick-view" style="position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%) translateY(50px); background: rgba(255,255,255,0.9); backdrop-filter: blur(8px); padding: 8px 16px; border-radius: 40px; font-size: 12px; font-weight: 600; color: #f06292; opacity: 0; transition: all 0.3s; cursor: pointer; z-index: 2;">👁️ Quick View</div>
                                         </div>
                                     </a>
@@ -161,41 +151,57 @@
                                         <p style="font-size: 13px; color: #a1887f; margin-bottom: 12px; min-height: 42px; line-height: 1.5; flex: 1; display: flex; flex-direction: column; justify-content: flex-start;">{{ $produk->deskripsi ?: '✨ Nikmati kelezatan produk ini' }}</p>
                                         
                                         @php
-                                            // Mock data agar konsisten per produk
-                                            $rating = 4.6 + ($produk->id % 4) / 10; 
-                                            $sold = 50 + ($produk->id * 23 % 450);
-                                            $reviews = floor($sold * 0.35);
+                                            // Statistik asli dari kolom produk (bukan mock).
+                                            $rating = (float) ($produk->rating_avg ?? 0);
+                                            $sold = (int) ($produk->terjual ?? 0);
+                                            $reviews = (int) ($produk->reviews_count ?? 0);
                                         @endphp
                                         <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: #8d6e63; margin-bottom: 15px; background: linear-gradient(135deg, #fff5f8, #fff0f5); padding: 5px 12px; border-radius: 50px; border: 1px solid rgba(240,98,146,0.15); width: fit-content; margin-left: auto; margin-right: auto; box-shadow: 0 2px 5px rgba(240,98,146,0.05);">
-                                            <span style="color: #ffb300; font-weight: 900;"><i class="fas fa-star" style="margin-right: 2px;"></i>{{ number_format($rating, 1) }}</span>
-                                            <span style="color: #f0c0d0;">•</span>
-                                            <span style="font-weight: 800; color: #6d4c41;">{{ $sold }}+ <span style="font-weight: 600; color: #8d6e63;">terjual</span></span>
-                                            <span style="color: #f0c0d0;">•</span>
-                                            <span style="font-weight: 800; color: #6d4c41;">{{ $reviews }} <span style="font-weight: 600; color: #8d6e63;">penilaian</span></span>
+                                            @if($reviews > 0)
+                                                <span style="color: #ffb300; font-weight: 900;"><i class="fas fa-star" style="margin-right: 2px;"></i>{{ number_format($rating, 1) }}</span>
+                                                <span style="color: #f0c0d0;">•</span>
+                                            @endif
+                                            @if($sold > 0)
+                                                <span style="font-weight: 800; color: #6d4c41;">{{ $sold }}+ <span style="font-weight: 600; color: #8d6e63;">terjual</span></span>
+                                                <span style="color: #f0c0d0;">•</span>
+                                            @endif
+                                            @if($reviews > 0)
+                                                <span style="font-weight: 800; color: #6d4c41;">{{ $reviews }} <span style="font-weight: 600; color: #8d6e63;">penilaian</span></span>
+                                            @else
+                                                <span style="font-weight: 800; color: #6d4c41;">✨ Baru</span>
+                                            @endif
                                         </div>
 
                                         <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 20px; flex-shrink: 0;">
-                                            <span class="price" style="font-size: 24px; font-weight: 900; color: #f06292;">Rp {{ number_format($produk->harga, 0, ',', '.') }}</span>
+                                            @if($produk->harga > 0)
+                                                <span class="price" style="font-size: 24px; font-weight: 900; color: #f06292;">Rp {{ number_format($produk->harga, 0, ',', '.') }}</span>
+                                            @else
+                                                <span class="price" style="font-size: 18px; font-weight: 900; color: #8d6e63;">Hubungi Admin</span>
+                                            @endif
                                         </div>
                                         <div style="display: flex; gap: 12px; justify-content: center; flex-shrink: 0;">
-                                            <button class="btn-add-to-cart" data-produk="{{ json_encode([
-                                                'id' => $produk->id,
-                                                'nama_produk' => $produk->nama_produk,
-                                                'deskripsi' => $produk->deskripsi,
-                                                'harga' => $produk->harga,
-                                                'options' => $produk->options ?? [],
-                                                'gambar' => $imageUrl,
-                                                'variant_images' => $variantImages
-                                            ]) }}" style="background: linear-gradient(135deg, #e0f2f1, #b2dfdb); color: #00695c; padding: 12px 18px; border-radius: 50px; border: none; font-weight: 800; font-size: 12px; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,105,92,0.15);">🛒 Tambah</button>
-                                            <button class="btn-order-now" data-produk="{{ json_encode([
-                                                'id' => $produk->id,
-                                                'nama_produk' => $produk->nama_produk,
-                                                'deskripsi' => $produk->deskripsi,
-                                                'harga' => $produk->harga,
-                                                'options' => $produk->options ?? [],
-                                                'gambar' => $imageUrl,
-                                                'variant_images' => $variantImages
-                                            ]) }}" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); color: #f06292; padding: 12px 24px; border-radius: 50px; border: none; font-weight: 800; font-size: 12px; cursor: pointer; transition: all 0.3s; display: inline-block; box-shadow: 0 4px 12px rgba(240,98,146,0.15);">💬 Pesan</button>
+                                            @if($produk->harga > 0)
+                                                <button class="btn-add-to-cart" type="button" data-produk='{!! json_encode([
+                                                    "id" => $produk->id,
+                                                    "nama_produk" => $produk->nama_produk,
+                                                    "deskripsi" => $produk->deskripsi,
+                                                    "harga" => $produk->harga,
+                                                    "options" => $options,
+                                                    "gambar" => $imageUrl,
+                                                    "variant_images" => $variantImages
+                                                ]) !!}' style="background: linear-gradient(135deg, #e0f2f1, #b2dfdb); color: #00695c; padding: 12px 18px; border-radius: 50px; border: none; font-weight: 800; font-size: 12px; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,105,92,0.15);">🛒 Tambah</button>
+                                                <button class="btn-order-now" type="button" data-produk='{!! json_encode([
+                                                    "id" => $produk->id,
+                                                    "nama_produk" => $produk->nama_produk,
+                                                    "deskripsi" => $produk->deskripsi,
+                                                    "harga" => $produk->harga,
+                                                    "options" => $options,
+                                                    "gambar" => $imageUrl,
+                                                    "variant_images" => $variantImages
+                                                ]) !!}' style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); color: #f06292; padding: 12px 24px; border-radius: 50px; border: none; font-weight: 800; font-size: 12px; cursor: pointer; transition: all 0.3s; display: inline-block; box-shadow: 0 4px 12px rgba(240,98,146,0.15);">💬 Pesan</button>
+                                            @else
+                                                <a href="https://wa.me/6285121111397?text={{ rawurlencode('Halo Dear Seana, saya ingin menanyakan harga ' . $produk->nama_produk) }}" target="_blank" rel="noopener" style="background: linear-gradient(135deg, #25D366, #128C7E); color: white; padding: 12px 24px; border-radius: 50px; text-decoration: none; font-weight: 800; font-size: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(37,211,102,0.25);">💬 Tanya Harga</a>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -225,7 +231,7 @@
     <!-- Modal Pilihan Pesanan dengan Metode Pembayaran untuk Pesan Sekarang -->
     <div id="orderModal" class="order-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); z-index: 1000; align-items: center; justify-content: center;">
         <div class="modal-content" style="background: linear-gradient(145deg, #FFF8F0, #FFF5EE); border-radius: 48px; max-width: 580px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 35px 70px rgba(0,0,0,0.3);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: sticky; top: 0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: sticky; top: 0; z-index: 20; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
                 <h3 id="modalTitle" style="color: #6d4c41; margin: 0; font-size: 26px; font-weight: 900;">Nama Produk</h3>
                 <p id="modalDesc" style="color: #8d6e63; margin: 10px 0 0; font-size: 14px;">Deskripsi produk</p>
                 <button class="modal-close" style="position: absolute; right: 28px; top: 24px; background: rgba(255,255,255,0.95); border: none; font-size: 28px; cursor: pointer; color: #6d4c41; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">&times;</button>
@@ -601,7 +607,7 @@
             // ========== ANCHOR NAVIGATION DARI HOME ==========
 // Ambil anchor dari URL (misal #birthday-cake atau #cookies)
 const hash = window.location.hash;
-if (hash === '#birthday-cake' || hash === '#cookies') {
+if (hash && document.querySelector('.category-tab[href="' + hash + '"]')) {
     setTimeout(function() {
         const targetSection = document.querySelector(hash);
         if (targetSection) {
@@ -664,6 +670,8 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
             
             // ========== CART FUNCTIONS ==========
             function addToCart(product, selections, quantity) {
+                if (!requireLogin()) return;
+
                 const cartItem = {
                     id: product.id,
                     name: product.nama_produk,
@@ -685,7 +693,7 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     cart.push(cartItem);
                 }
                 
-                localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                 showToastMessage('🛒 Ditambahkan ke keranjang! ✨');
                 updateCartBadge();
                 animateCart();
@@ -745,29 +753,45 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                 }
             }
             
-            let savedCustName = {!! json_encode(auth()->check() ? auth()->user()->name : '') !!};
-            let savedCustPhone = {!! json_encode(auth()->check() ? auth()->user()->no_wa : '') !!};
-            let savedCustAddress = {!! json_encode(auth()->check() ? auth()->user()->alamat : '') !!};
+            let savedCustName = @json(auth()->check() ? auth()->user()->name : '');
+            let savedCustPhone = @json(auth()->check() ? auth()->user()->no_wa : '');
+            let savedCustAddress = @json(auth()->check() ? auth()->user()->alamat : '');
+            let savedCustLat = @json(auth()->check() ? auth()->user()->latitude : null);
+            let savedCustLng = @json(auth()->check() ? auth()->user()->longitude : null);
+            // Ekspos ke window agar bisa dibaca script peta (blok <script> terpisah)
+            window.savedCustLat = savedCustLat;
+            window.savedCustLng = savedCustLng;
+
+            // Pesan / buka keranjang wajib login lebih dulu.
+            function requireLogin() {
+                if (window.IS_AUTH) return true;
+
+                showToastMessage('🔒 Silakan login dulu untuk memesan');
+                setTimeout(function () { window.location.href = window.LOGIN_URL; }, 700);
+                return false;
+            }
 
             function showCartModal() {
+                if (!requireLogin()) return;
+
                 if (cart.length === 0) {
                     showToastMessage('✨ Keranjang belanja masih kosong');
                     return;
                 }
                 
                 // Preserve inputs if they exist
-                const custNameInput = document.getElementById('custName');
+                const custNameInput = document.getElementById('cartCustName');
                 if (custNameInput) savedCustName = custNameInput.value;
-                const custPhoneInput = document.getElementById('custPhone');
+                const custPhoneInput = document.getElementById('cartCustPhone');
                 if (custPhoneInput) savedCustPhone = custPhoneInput.value;
-                const custAddressInput = document.getElementById('custAddress');
+                const custAddressInput = document.getElementById('cartCustAddress');
                 if (custAddressInput) savedCustAddress = custAddressInput.value;
                 
                 let grandTotal = 0;
                 let cartHtml = `
                     <div id="cartModal" class="order-modal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); z-index: 1001; align-items: center; justify-content: center;">
                         <div class="modal-content" style="background: linear-gradient(145deg, #FFF8F0, #FFF5EE); border-radius: 48px; max-width: 680px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 35px 70px rgba(0,0,0,0.3);">
-                            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: sticky; top: 0;">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: sticky; top: 0; z-index: 20;">
                                 <h3 style="color: #6d4c41; margin: 0; font-size: 26px; font-weight: 900;">🛒 Keranjang Belanja</h3>
                                 <button class="cart-modal-close" style="position: absolute; right: 28px; top: 24px; background: rgba(255,255,255,0.95); border: none; font-size: 28px; cursor: pointer; color: #6d4c41; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s;">&times;</button>
                             </div>
@@ -804,15 +828,34 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                                     <span>👤</span> Informasi Pengiriman
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 12px;">
-                                    <input type="text" id="custName" value="${savedCustName || ''}" placeholder="Nama Lengkap" style="padding: 12px 16px; border-radius: 12px; border: 1px solid #f0d0d0; outline: none; font-family: inherit;">
-                                    <input type="text" id="custPhone" value="${savedCustPhone || ''}" placeholder="Nomor WhatsApp (Contoh: 0812...)" style="padding: 12px 16px; border-radius: 12px; border: 1px solid #f0d0d0; outline: none; font-family: inherit;">
-                                    <textarea id="custAddress" placeholder="Alamat Pengiriman Lengkap" rows="3" style="padding: 12px 16px; border-radius: 12px; border: 1px solid #f0d0d0; outline: none; font-family: inherit; resize: none;">${savedCustAddress || ''}</textarea>
+                                    <input type="text" id="cartCustName" value="${savedCustName || ''}" placeholder="Nama Lengkap" style="padding: 12px 16px; border-radius: 12px; border: 1px solid #f0d0d0; outline: none; font-family: inherit;">
+                                    <input type="text" id="cartCustPhone" value="${savedCustPhone || ''}" placeholder="Nomor WhatsApp (Contoh: 0812...)" style="padding: 12px 16px; border-radius: 12px; border: 1px solid #f0d0d0; outline: none; font-family: inherit;">
+                                    <textarea id="cartCustAddress" placeholder="Alamat Pengiriman Lengkap" rows="3" style="padding: 12px 16px; border-radius: 12px; border: 1px solid #f0d0d0; outline: none; font-family: inherit; resize: none;">${savedCustAddress || ''}</textarea>
                                 </div>
                             </div>
+                            <div class="customer-map" style="margin: 0 24px 24px 24px; padding: 22px; background: white; border-radius: 32px; border: 1px solid #ffe0d0;">
+                                <div style="font-weight: 800; color: #6d4c41; margin-bottom: 12px; font-size: 16px; display: flex; align-items: center; gap: 10px;">
+                                    <span>📍</span> Titik Pengiriman
+                                </div>
+                                <div id="cartMapContainer" style="border-radius: 16px; overflow: hidden; border: 1px solid #ffe0d0; position: relative; z-index: 0; isolation: isolate;">
+                                    <div id="cartMap" style="height: 220px; width: 100%; position: relative; z-index: 0;"></div>
+                                </div>
+                                <div style="margin-top: 12px; font-size: 12px; color: #8d6e63; line-height: 1.5;">Geser pin merah atau klik peta untuk memilih lokasi pengiriman.</div>
+                                <div id="cartTujuanText" style="margin-top: 6px; font-size: 13px; color: #6d4c41; font-weight: 600; line-height: 1.5;">Menyiapkan peta...</div>
+                                <div id="cartDistanceText" style="margin-top: 4px; font-size: 13px; color: #8d6e63;"></div>
+                            </div>
                             <div class="modal-footer" style="padding: 24px 28px 28px; border-top: 1px solid #ffe0d0; background: rgba(255,248,240,0.95); border-radius: 0 0 48px 48px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="color: #8d6e63; font-size: 14px; font-weight: 600;">Subtotal Barang</span>
+                                    <span id="cartSubtotalDisplay" style="color: #6d4c41; font-weight: 800;">${formatRupiah(grandTotal)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                    <span style="color: #8d6e63; font-size: 14px; font-weight: 600;">Ongkos Kirim</span>
+                                    <span id="cartOngkirDisplay" style="color: #f06292; font-weight: 800;">${formatRupiah(window.currentOngkir || 0)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-top: 16px; border-top: 1px dashed #f0c0d0;">
                                     <span style="font-weight: 800; color: #6d4c41; font-size: 18px;">Total Belanja:</span>
-                                    <span style="font-size: 32px; font-weight: 900; color: #f06292;">${formatRupiah(grandTotal)}</span>
+                                    <span id="cartTotalDisplay" style="font-size: 32px; font-weight: 900; color: #f06292;">${formatRupiah(grandTotal + (window.currentOngkir || 0))}</span>
                                 </div>
                                 <div style="display: flex; gap: 16px;">
                                     <button id="clearCartBtn" style="flex: 1; padding: 16px; border-radius: 60px; border: 2px solid #f0c0d0; background: white; color: #e57373; font-weight: 800; cursor: pointer; transition: all 0.3s;">Kosongkan</button>
@@ -828,6 +871,12 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                 
                 document.body.insertAdjacentHTML('beforeend', cartHtml);
                 document.body.style.overflow = 'hidden';
+
+                // Peta keranjang (ongkir dihitung dari rute) + total realtime
+                window.cartSubtotal = grandTotal;
+                if (typeof initCartMap === 'function') {
+                    initCartMap();
+                }
                 
                 const cartModal = document.getElementById('cartModal');
                 const closeBtn = cartModal.querySelector('.cart-modal-close');
@@ -843,7 +892,7 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                 
                 clearBtn.addEventListener('click', () => {
                     cart = [];
-                    localStorage.removeItem('sweetSavoryCart');
+                    localStorage.removeItem(window.CART_KEY);
                     updateCartBadge();
                     cartModal.remove();
                     document.body.style.overflow = '';
@@ -862,12 +911,12 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                         if (cart[index].quantity > 1) {
                             cart[index].quantity--;
                             cart[index].total_price = calculateTotalPriceForCartItem(cart[index]);
-                            localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                            localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                             updateCartBadge();
                             showCartModal();
                         } else {
                             cart.splice(index, 1);
-                            localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                            localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                             updateCartBadge();
                             if (cart.length === 0) {
                                 cartModal.remove();
@@ -885,7 +934,7 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                         const index = parseInt(btn.dataset.index);
                         cart[index].quantity++;
                         cart[index].total_price = calculateTotalPriceForCartItem(cart[index]);
-                        localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                        localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                         updateCartBadge();
                         showCartModal();
                     });
@@ -895,7 +944,7 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     btn.addEventListener('click', (e) => {
                         const index = parseInt(btn.dataset.index);
                         cart.splice(index, 1);
-                        localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                        localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                         updateCartBadge();
                         if (cart.length === 0) {
                             cartModal.remove();
@@ -952,9 +1001,9 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     return;
                 }
                 
-                const custNameInput = document.getElementById('custName');
-                const custPhoneInput = document.getElementById('custPhone');
-                const custAddressInput = document.getElementById('custAddress');
+                const custNameInput = document.getElementById('cartCustName');
+                const custPhoneInput = document.getElementById('cartCustPhone');
+                const custAddressInput = document.getElementById('cartCustAddress');
                 
                 if (!custNameInput || !custNameInput.value.trim()) {
                     alert('Mohon isi Nama Lengkap Anda.');
@@ -1016,6 +1065,8 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     nama_pelanggan: namaPelanggan,
                     no_wa: noWaPelanggan,
                     alamat: alamatPelanggan,
+                    latitude: window.checkoutLat ?? savedCustLat ?? null,
+                    longitude: window.checkoutLng ?? savedCustLng ?? null,
                     metode_pembayaran: selectedPaymentMethod,
                     items: JSON.stringify(cart),
                     total_harga: grandTotal,
@@ -1032,6 +1083,12 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                         body: JSON.stringify(payload)
                     });
                     
+                    if (response.status === 401 || response.status === 419 || response.redirected) {
+                        showToastMessage('🔒 Silakan login dulu untuk memesan');
+                        setTimeout(function () { window.location.href = window.LOGIN_URL; }, 700);
+                        return;
+                    }
+
                     const result = await response.json();
                     if (!result.success) {
                         alert("Gagal memproses pesanan ke database: " + result.message);
@@ -1041,31 +1098,32 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     // Menjalankan Snap Midtrans
                     window.snap.pay(result.snap_token, {
                         onSuccess: function(snapResult){
-                            fetch('{{ route("user.checkout.success_local") }}', {
+                            sessionStorage.setItem('payment_success_confetti', 'true');
+                            showToastMessage('✅ Pembayaran berhasil diproses!');
+                            // Sinkronkan status ke server (verifikasi ulang ke Midtrans).
+                            fetch("{{ route('user.checkout.success_local') }}", {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                                 },
                                 body: JSON.stringify({ snap_token: result.snap_token })
-                            }).then(() => {
-                                sessionStorage.setItem('payment_success_confetti', 'true');
-                                showToastMessage('✅ Pembayaran berhasil diproses!');
+                            }).catch(() => {}).finally(() => {
                                 // Kosongkan keranjang
                                 cart = [];
-                                localStorage.removeItem('sweetSavoryCart');
+                                localStorage.removeItem(window.CART_KEY);
                                 savedCustName = '';
                                 savedCustPhone = '';
                                 savedCustAddress = '';
                                 updateCartBadge();
-                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 2000);
+                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 1500);
                             });
                         },
                         onPending: function(snapResult){
                             showToastMessage('⏳ Silakan selesaikan pembayaran Anda.');
                             // Kosongkan keranjang
                             cart = [];
-                            localStorage.removeItem('sweetSavoryCart');
+                            localStorage.removeItem(window.CART_KEY);
                             savedCustName = '';
                             savedCustPhone = '';
                             savedCustAddress = '';
@@ -1090,14 +1148,54 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
             }
             
             function loadCartFromStorage() {
-                const savedCart = localStorage.getItem('sweetSavoryCart');
+                // Saat baru login, pindahkan isi keranjang tamu (guest) ke keranjang akun ini,
+                // lalu hapus keranjang tamu agar tidak terbawa/tercampur ke akun lain.
+                if (window.CART_USER_SCOPE && window.CART_USER_SCOPE !== 'guest') {
+                    try {
+                        const guestRaw = localStorage.getItem('sweetSavoryCart_guest');
+                        if (guestRaw) {
+                            const guestCart = JSON.parse(guestRaw) || [];
+                            const accountCart = JSON.parse(localStorage.getItem(window.CART_KEY) || '[]');
+                            guestCart.forEach(function (g) {
+                                const idx = accountCart.findIndex(function (x) {
+                                    return x.id === g.id && JSON.stringify(x.selections) === JSON.stringify(g.selections);
+                                });
+                                if (idx !== -1) {
+                                    accountCart[idx].quantity += g.quantity;
+                                    accountCart[idx].total_price += g.total_price;
+                                } else {
+                                    accountCart.push(g);
+                                }
+                            });
+                            localStorage.setItem(window.CART_KEY, JSON.stringify(accountCart));
+                            localStorage.removeItem('sweetSavoryCart_guest');
+                        }
+                    } catch (e) {
+                        console.error('migrateGuestCart error:', e);
+                    }
+                }
+
+                // Tamu tidak boleh punya isi keranjang: wajib login dulu.
+                if (!window.IS_AUTH) {
+                    cart = [];
+                    localStorage.removeItem(window.CART_KEY);
+                    localStorage.removeItem(window.GALLERY_CART_KEY);
+                    updateCartBadge();
+                    return;
+                }
+
+                const savedCart = localStorage.getItem(window.CART_KEY);
                 if (savedCart) {
                     cart = JSON.parse(savedCart);
                     updateCartBadge();
                 }
             }
             
-            loadCartFromStorage();
+            try {
+                loadCartFromStorage();
+            } catch (e) {
+                console.error('loadCartFromStorage error:', e);
+            }
             
             const floatingCart = document.querySelector('.floating-cart');
             if (floatingCart) {
@@ -1231,10 +1329,8 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                 modalDesc.textContent = product.deskripsi || 'Nikmati kelezatan produk ini';
                 
                 if (actionType === 'order') {
-                    if (paymentSection) paymentSection.style.display = 'block';
                     confirmBtn.innerHTML = '📱 Proses Pembayaran';
                 } else {
-                    if (paymentSection) paymentSection.style.display = 'none';
                     confirmBtn.innerHTML = '🛒 Tambah ke Keranjang';
                 }
                 
@@ -1268,7 +1364,7 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                                 }
                                 html += `
                                     <div class="radio-option" data-choice="${choice}" data-key="${opt.key}" style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: ${isChecked ? 'linear-gradient(135deg, #fce4ec, #f8bbd0)' : '#fff'}; border: 2px solid ${isChecked ? '#f06292' : '#f0d0d0'}; border-radius: 50px; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);">
-                                        ${choiceImage ? `<img src="${choiceImage}" style="width: 45px; height: 45px; object-fit: cover; border-radius: 15px;">` : ''}
+                                        ${choiceImage ? '<img src="' + choiceImage + '" style="width: 45px; height: 45px; object-fit: cover; border-radius: 15px;">' : ''}
                                         <input type="radio" name="${opt.key}" value="${choice.replace(/"/g, '&quot;')}" id="${opt.key}_${choice.replace(/[^a-zA-Z0-9]/g, '_')}" ${isChecked ? 'checked' : ''} style="accent-color: #f06292; width: 18px; height: 18px;">
                                         <label for="${opt.key}_${choice.replace(/[^a-zA-Z0-9]/g, '_')}" style="flex: 1; cursor: pointer; color: #6d4c41; font-weight: 700;">${choice}</label>
                                     </div>
@@ -1333,8 +1429,8 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                                 </div>
                             </div>
                             
-                            <div id="map-container" style="margin-top: 15px; border-radius: 12px; overflow: hidden; border: 1px solid #f0d0d0; position: relative;">
-                                <div id="map" style="height: 250px; width: 100%; z-index: 1;"></div>
+                            <div id="map-container" style="margin-top: 15px; border-radius: 12px; overflow: hidden; border: 1px solid #f0d0d0; position: relative; z-index: 0; isolation: isolate;">
+                                <div id="map" style="height: 250px; width: 100%; position: relative; z-index: 0;"></div>
                             </div>
                             
                             <div style="margin-top: 20px;">
@@ -1421,13 +1517,23 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
             }
             
             function openModal(product, actionType = 'order') {
-                buildModalContent(product, actionType);
+                if (!requireLogin()) return;
+
+                try {
+                    buildModalContent(product, actionType);
+                } catch(e) {
+                    console.error('buildModalContent error:', e);
+                }
                 modal.style.display = 'flex';
                 document.body.style.overflow = 'hidden';
                 if (actionType === 'order') {
                     setTimeout(initOrderPaymentHandlers, 50);
                     window.currentOngkir = 0;
-                    initMap();
+                    try {
+                        initMap();
+                    } catch(e) {
+                        console.error('initMap error:', e);
+                    }
                 }
             }
             
@@ -1482,6 +1588,8 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     nama_pelanggan: custNameInput,
                     no_wa: custPhoneInput,
                     alamat: custAddressInput,
+                    latitude: window.checkoutLat ?? savedCustLat ?? null,
+                    longitude: window.checkoutLng ?? savedCustLng ?? null,
                     metode_pembayaran: selectedPaymentMethod || 'bank',
                     items: JSON.stringify(singleItem),
                     total_harga: grandTotal,
@@ -1498,6 +1606,12 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                         body: JSON.stringify(payload)
                     });
                     
+                    if (response.status === 401 || response.status === 419 || response.redirected) {
+                        showToastMessage('🔒 Silakan login dulu untuk memesan');
+                        setTimeout(function () { window.location.href = window.LOGIN_URL; }, 700);
+                        return;
+                    }
+
                     const result = await response.json();
                     if (!result.success) {
                         alert("Gagal memproses pesanan ke database: " + result.message);
@@ -1509,29 +1623,29 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     // Menjalankan Snap Midtrans
                     window.snap.pay(result.snap_token, {
                         onSuccess: function(snapResult){
-                            fetch('{{ route("user.checkout.success_local") }}', {
+                            sessionStorage.setItem('payment_success_confetti', 'true');
+                            showToastMessage('✅ Pembayaran berhasil diproses!');
+                            fetch("{{ route('user.checkout.success_local') }}", {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                                 },
                                 body: JSON.stringify({ snap_token: result.snap_token })
-                            }).then(() => {
-                                sessionStorage.setItem('payment_success_confetti', 'true');
-                                showToastMessage('✅ Pembayaran berhasil diproses!');
+                            }).catch(() => {}).finally(() => {
                                 cart = [];
-                                localStorage.removeItem('sweetSavoryCart');
+                                localStorage.removeItem(window.CART_KEY);
                                 savedCustName = '';
                                 savedCustPhone = '';
                                 savedCustAddress = '';
                                 updateCartBadge();
-                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 2000);
+                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 1500);
                             });
                         },
                         onPending: function(snapResult){
                             showToastMessage('⏳ Silakan selesaikan pembayaran Anda.');
                             cart = [];
-                            localStorage.removeItem('sweetSavoryCart');
+                            localStorage.removeItem(window.CART_KEY);
                             savedCustName = '';
                             savedCustPhone = '';
                             savedCustAddress = '';
@@ -1555,10 +1669,16 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
             // Tombol Masukkan Keranjang
             document.querySelectorAll('.btn-add-to-cart').forEach(btn => {
                 btn.addEventListener('click', function(e) {
+                    e.preventDefault();
                     const produkData = this.getAttribute('data-produk');
                     if (produkData) {
-                        const product = JSON.parse(produkData);
-                        openModal(product, 'cart');
+                        try {
+                            const product = JSON.parse(produkData);
+                            openModal(product, 'cart');
+                        } catch(err) {
+                            console.error('Gagal parse produk:', err);
+                            alert('Gagal memuat detail produk. Silakan coba lagi.');
+                        }
                     }
                 });
             });
@@ -1566,10 +1686,16 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
             // Tombol Pesan Sekarang
             document.querySelectorAll('.btn-order-now').forEach(btn => {
                 btn.addEventListener('click', function(e) {
+                    e.preventDefault();
                     const produkData = this.getAttribute('data-produk');
                     if (produkData) {
-                        const product = JSON.parse(produkData);
-                        openModal(product, 'order');
+                        try {
+                            const product = JSON.parse(produkData);
+                            openModal(product, 'order');
+                        } catch(err) {
+                            console.error('Gagal parse produk:', err);
+                            alert('Gagal memuat detail produk. Silakan coba lagi.');
+                        }
                     }
                 });
             });
@@ -1629,10 +1755,16 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                     attribution: '© OpenStreetMap'
                 }).addTo(mapInstance);
 
+                const destLat = (window.savedCustLat !== null && window.savedCustLat !== undefined && window.savedCustLng !== null && window.savedCustLng !== undefined) ? window.savedCustLat : RESTO_LAT;
+                const destLng = (window.savedCustLat !== null && window.savedCustLat !== undefined && window.savedCustLng !== null && window.savedCustLng !== undefined) ? window.savedCustLng : RESTO_LNG;
+                if (window.savedCustLat !== null && window.savedCustLat !== undefined && window.savedCustLng !== null && window.savedCustLng !== undefined) {
+                    window.checkoutLat = window.savedCustLat;
+                    window.checkoutLng = window.savedCustLng;
+                }
                 routingControl = L.Routing.control({
                     waypoints: [
                         L.latLng(RESTO_LAT, RESTO_LNG),
-                        L.latLng(RESTO_LAT, RESTO_LNG)
+                        L.latLng(destLat, destLng)
                     ],
                     routeWhileDragging: true,
                     showAlternatives: false,
@@ -1748,6 +1880,8 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
         }
 
         function updateAddressFromMarker(lat, lng) {
+            window.checkoutLat = lat;
+            window.checkoutLng = lng;
             const destText = document.getElementById('routing-tujuan-text');
             if(destText) destText.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
             
@@ -1760,6 +1894,144 @@ if (hash === '#birthday-cake' || hash === '#cookies') {
                         if (destText) destText.textContent = data.display_name;
                     }
                 });
+        }
+
+        let cartMapInstance = null;
+        let cartRoutingControl = null;
+
+        function initCartMap() {
+            setTimeout(() => {
+                const container = document.getElementById('cartMap');
+                if (!container) return;
+
+                if (cartMapInstance) {
+                    try { cartMapInstance.remove(); } catch (e) {}
+                    cartMapInstance = null;
+                }
+
+                // Reset ongkir agar dihitung ulang dari rute keranjang
+                window.currentOngkir = 0;
+
+                const hasSaved = (window.savedCustLat !== null && window.savedCustLat !== undefined && window.savedCustLng !== null && window.savedCustLng !== undefined);
+                const destLat = hasSaved ? window.savedCustLat : RESTO_LAT;
+                const destLng = hasSaved ? window.savedCustLng : RESTO_LNG;
+
+                cartMapInstance = L.map('cartMap').setView([destLat, destLng], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(cartMapInstance);
+
+                if (hasSaved) {
+                    window.checkoutLat = destLat;
+                    window.checkoutLng = destLng;
+                }
+
+                cartRoutingControl = L.Routing.control({
+                    waypoints: [
+                        L.latLng(RESTO_LAT, RESTO_LNG),
+                        L.latLng(destLat, destLng)
+                    ],
+                    routeWhileDragging: true,
+                    showAlternatives: false,
+                    fitSelectedRoutes: true,
+                    show: false,
+                    createMarker: function (i, wp) {
+                        if (i === 0) {
+                            return L.marker(wp.latLng, {
+                                draggable: false,
+                                icon: L.icon({
+                                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+                                })
+                            }).bindPopup('Restoran: Sweet & Savory Seana');
+                        }
+                        return L.marker(wp.latLng, {
+                            draggable: true,
+                            icon: L.icon({
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+                            })
+                        }).bindPopup('Lokasi Tujuan');
+                    },
+                    lineOptions: {
+                        styles: [{ color: '#4caf50', opacity: 0.8, weight: 6 }]
+                    }
+                }).addTo(cartMapInstance);
+
+                cartRoutingControl.on('routesfound', function (e) {
+                    const summary = e.routes[0].summary;
+                    const distanceKm = summary.totalDistance / 1000;
+                    const timeMinutes = Math.round(summary.totalTime / 60);
+
+                    let ongkir = Math.ceil(distanceKm) * 2000;
+                    if (ongkir < 5000) ongkir = 5000;
+                    window.currentOngkir = ongkir;
+                    updateCartTotals(distanceKm, timeMinutes);
+
+                    const destLatLng = e.routes[0].waypoints[1].latLng;
+                    updateCartAddress(destLatLng.lat, destLatLng.lng);
+                });
+
+                cartRoutingControl.on('waypointschanged', function (e) {
+                    const wps = e.waypoints;
+                    if (wps && wps.length > 1 && wps[1].latLng) {
+                        const destLatLng = wps[1].latLng;
+                        updateCartAddress(destLatLng.lat, destLatLng.lng);
+                        if (!window.currentOngkir) {
+                            const directKm = L.latLng(RESTO_LAT, RESTO_LNG).distanceTo(destLatLng) / 1000;
+                            let ongkir = Math.ceil(directKm) * 2000;
+                            if (ongkir < 5000) ongkir = 5000;
+                            window.currentOngkir = ongkir;
+                            updateCartTotals(directKm, null);
+                        }
+                    }
+                });
+
+                cartMapInstance.on('click', function (e) {
+                    if (cartRoutingControl) cartRoutingControl.spliceWaypoints(1, 1, e.latlng);
+                });
+
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(function (position) {
+                        if (cartRoutingControl) {
+                            cartRoutingControl.spliceWaypoints(1, 1, L.latLng(position.coords.latitude, position.coords.longitude));
+                        }
+                    });
+                }
+            }, 350);
+        }
+
+        function updateCartTotals(distanceKm, timeMinutes) {
+            const distEl = document.getElementById('cartDistanceText');
+            if (distEl) {
+                let txt = 'Jarak: ' + distanceKm.toFixed(1) + ' km';
+                if (timeMinutes !== null && timeMinutes !== undefined) txt += ' (≈ ' + timeMinutes + ' menit)';
+                distEl.textContent = txt;
+            }
+            const ongkir = window.currentOngkir || 0;
+            const ongkirEl = document.getElementById('cartOngkirDisplay');
+            if (ongkirEl) ongkirEl.textContent = 'Rp ' + new Intl.NumberFormat('id-ID').format(ongkir);
+            const totalEl = document.getElementById('cartTotalDisplay');
+            if (totalEl) totalEl.textContent = 'Rp ' + new Intl.NumberFormat('id-ID').format((window.cartSubtotal || 0) + ongkir);
+        }
+
+        function updateCartAddress(lat, lng) {
+            window.checkoutLat = lat;
+            window.checkoutLng = lng;
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=id`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.display_name) {
+                        const tujuan = document.getElementById('cartTujuanText');
+                        if (tujuan) tujuan.textContent = data.display_name;
+                        const addressInput = document.getElementById('cartCustAddress');
+                        if (addressInput && !addressInput.value.trim()) addressInput.value = data.display_name;
+                    }
+                })
+                .catch(() => {});
         }
     </script>
 @endsection

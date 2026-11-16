@@ -96,10 +96,12 @@
 
             <!-- Gallery Grid - 4 FOTO YANG BISA DIKLIK -->
             <div class="promise-right gallery-grid" style="flex: 1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
-                @foreach($produks->take(4) as $produk)
+                @foreach($produks->where('harga', '>', 0)->take(4) as $produk)
                 @php
                     // Check if image is from storage or assets
-                    if ($produk->gambar && (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/'))) {
+                    if ($produk->gambar && str_starts_with($produk->gambar, 'assets/')) {
+                        $imgUrl = asset($produk->gambar);
+                    } elseif ($produk->gambar && (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/'))) {
                         $imgUrl = asset('assets/img_produk/' . $produk->gambar);
                     } else {
                         $imgUrl = $produk->gambar ? asset('storage/' . $produk->gambar) : 'https://picsum.photos/seed/'.$produk->id.'/300/300';
@@ -399,26 +401,41 @@
     <script>
         // Data produk untuk gallery
         const galleryProducts = [
-            @foreach($produks->take(4) as $produk)
+            @foreach($produks->where('harga', '>', 0)->take(4) as $produk)
             @php
-                if ($produk->gambar && (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/'))) {
+                if ($produk->gambar && str_starts_with($produk->gambar, 'assets/')) {
+                    $imgUrl = asset($produk->gambar);
+                } elseif ($produk->gambar && (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/'))) {
                     $imgUrl = asset('assets/img_produk/' . $produk->gambar);
                 } else {
                     $imgUrl = $produk->gambar ? asset('storage/' . $produk->gambar) : 'https://picsum.photos/seed/'.$produk->id.'/300/300';
                 }
+                $priceFormatted = 'Rp ' . number_format($produk->harga, 0, ',', '.');
             @endphp
             {
-                name: '{{ addslashes($produk->nama_produk) }}',
+                id: {{ $produk->id }},
+                name: @json($produk->nama_produk),
                 price: {{ $produk->harga }},
-                priceFormatted: 'Rp {{ number_format($produk->harga, 0, ',', '.') }}',
-                desc: '{{ addslashes($produk->deskripsi ?: "Produk spesial dari Anis Bakery") }}',
-                img: '{{ $imgUrl }}'
+                priceFormatted: @json($priceFormatted),
+                desc: @json($produk->deskripsi ?: 'Produk spesial dari Anis Bakery'),
+                img: @json($imgUrl),
+                url: @json(route('menu.show', $produk->id))
             },
             @endforeach
         ];
         
         let currentModalProduct = null;
-        let cart = JSON.parse(localStorage.getItem('sweetSavoryCartGallery') || '[]');
+        // Pesan / masukkan ke keranjang wajib login.
+        const IS_AUTH = {{ auth()->check() ? 'true' : 'false' }};
+        const LOGIN_URL = @json(route('login'));
+        let cart = [];
+        if (IS_AUTH) {
+            cart = JSON.parse(localStorage.getItem(window.CART_KEY) || '[]');
+        } else {
+            // Tamu wajib login dulu; jangan simpan keranjang tamu.
+            localStorage.removeItem(window.CART_KEY);
+            localStorage.removeItem(window.GALLERY_CART_KEY);
+        }
         
         document.addEventListener('DOMContentLoaded', function() {
             const modal = document.getElementById('productModal');
@@ -457,28 +474,44 @@
                 currentModalProduct = null;
             }
             
+            // Pesan / masukkan ke keranjang wajib login dulu.
+            function requireLogin() {
+                if (IS_AUTH) return true;
+
+                showToast('🔒 Silakan login dulu untuk memesan');
+                setTimeout(() => { window.location.href = LOGIN_URL; }, 700);
+                closeModal();
+                return false;
+            }
+
             function addToCart(product) {
-                const existingIndex = cart.findIndex(item => item.name === product.name);
+                const price = Number(product.price) || 0;
+                const existingIndex = cart.findIndex(item =>
+                    String(item.id) === String(product.id) &&
+                    JSON.stringify(item.selections || {}) === '{}'
+                );
+
                 if (existingIndex !== -1) {
                     cart[existingIndex].quantity += 1;
+                    cart[existingIndex].total_price = price * cart[existingIndex].quantity;
                 } else {
                     cart.push({
-                        id: Date.now(),
+                        id: product.id,
                         name: product.name,
-                        price: product.price,
+                        base_price: price,
+                        selections: {},
                         quantity: 1,
-                        img: product.img
+                        total_price: price
                     });
                 }
-                localStorage.setItem('sweetSavoryCartGallery', JSON.stringify(cart));
+
+                localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                 showToast(`🛒 ${product.name} ditambahkan ke keranjang!`);
                 closeModal();
             }
             
-            function sendToWA(product) {
-                const message = `Halo Dear Seana,%0A%0A*PESANAN BARU DARI GALERI*%0A%0A🍰 *${product.name}*%0A📦 Jumlah: 1%0A💰 *Total: ${product.priceFormatted}*%0A%0ATerima kasih! 🙏`;
-                window.open(`https://api.whatsapp.com/send/?phone=6281234567890&text=${message}&type=phone_number&app_absent=0`, '_blank');
-                closeModal();
+            function goToProduct(product) {
+                window.location.href = product.url;
             }
             
             // ========== TAB KATEGORI INTERAKTIF ==========
@@ -548,11 +581,13 @@
             closeBtn.addEventListener('click', closeModal);
             
             addToCartBtn.addEventListener('click', () => {
-                if (currentModalProduct) addToCart(currentModalProduct);
+                if (!currentModalProduct || !requireLogin()) return;
+                addToCart(currentModalProduct);
             });
             
             orderNowBtn.addEventListener('click', () => {
-                if (currentModalProduct) sendToWA(currentModalProduct);
+                if (!currentModalProduct || !requireLogin()) return;
+                goToProduct(currentModalProduct);
             });
             
             modal.addEventListener('click', (e) => {

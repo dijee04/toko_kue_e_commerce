@@ -22,6 +22,10 @@ class User extends Authenticatable
         'email',
         'no_wa',
         'alamat',
+        'latitude',
+        'longitude',
+        'kendaraan',
+        'plat_nomor',
         'password',
         'google_id',
         'role',
@@ -45,6 +49,8 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     public function orders()

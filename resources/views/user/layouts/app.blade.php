@@ -133,6 +133,17 @@
             100% { transform: translateY(-3px); }
         }
     </style>
+
+    {{-- Kunci penyimpanan keranjang dipisah per akun (guest / user id).
+         Mencegah keranjang satu akun terbaca oleh akun lain di browser yang sama. --}}
+    <script>
+        window.CART_USER_SCOPE = '{{ auth()->check() ? 'u' . auth()->id() : 'guest' }}';
+        window.CART_KEY = 'sweetSavoryCart_' + window.CART_USER_SCOPE;
+        window.GALLERY_CART_KEY = window.CART_KEY + '_gallery';
+        window.IS_AUTH = {{ auth()->check() ? 'true' : 'false' }};
+        window.LOGIN_URL = @json(route('login'));
+    </script>
+    @include('partials.favicon')
 </head>
 
 <body>
@@ -155,7 +166,6 @@
                 <li><a href="{{ route('beranda') }}">Home</a></li>
                 <li><a href="{{ route('menu') }}">Menu</a></li>
                 <li><a href="{{ route('our_story') }}">Our Story</a></li>
-                <li><a href="{{ route('katering') }}">Katering</a></li>
                 @auth
                     <li><a href="{{ route('pesanan_saya') }}" style="color: #f06292; font-weight: 700;"><i class="fas fa-shopping-bag"></i> Pesanan Saya</a></li>
                     <li style="margin-left: 10px; padding-left: 10px; border-left: 1px solid #eee;">
@@ -191,6 +201,12 @@
                         @endif
                     </a>
                 @endauth
+
+                @guest
+                    <a href="{{ route('login') }}" style="display:flex; align-items:center; gap:8px; padding: 10px 16px; border-radius: 12px; background: #fce4ec; color: #f06292; font-weight: 700; font-size: 0.9rem; text-decoration: none; border: 1px solid #f8bbd0; transition: all 0.2s;">
+                        <i class="fas fa-sign-in-alt"></i> Masuk
+                    </a>
+                @endguest
 
                 <!-- Tombol Pesan Sekarang -->
                 <a href="https://wa.me/{{ $global_setting->wa_number ?? '6281234567890' }}?text=Halo%20Dear%20Seana,%20saya%20tertarik%20dengan%20koleksi%20kue%20Anda."
@@ -429,5 +445,300 @@
     @endauth
 
     @stack('scripts')
+
+    <!-- Motion Effects: Scroll Reveal, Parallax, Stagger -->
+    <script>
+        // Scroll Reveal
+        const observerOptions = { threshold: 0.12, rootMargin: '0px 0px -60px 0px' };
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('revealed');
+                    revealObserver.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.scroll-reveal').forEach(el => revealObserver.observe(el));
+
+        // Stagger containers (reveal children one by one)
+        const staggerObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('stagger-revealed');
+                    staggerObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        document.querySelectorAll('.stagger').forEach(el => staggerObserver.observe(el));
+
+        // Stagger children animation class
+        const style = document.createElement('style');
+        style.textContent = `
+            .stagger > * {
+                opacity: 0;
+                transform: translateY(20px);
+                animation: none;
+            }
+            .stagger-revealed > * {
+                opacity: 1;
+                transform: translateY(0);
+                animation: staggerUp 0.5s ease-out forwards;
+            }
+            .stagger-revealed > *:nth-child(1) { animation-delay: 0.05s; }
+            .stagger-revealed > *:nth-child(2) { animation-delay: 0.1s; }
+            .stagger-revealed > *:nth-child(3) { animation-delay: 0.15s; }
+            .stagger-revealed > *:nth-child(4) { animation-delay: 0.2s; }
+            .stagger-revealed > *:nth-child(5) { animation-delay: 0.25s; }
+            .stagger-revealed > *:nth-child(6) { animation-delay: 0.3s; }
+            .stagger-revealed > *:nth-child(7) { animation-delay: 0.35s; }
+            .stagger-revealed > *:nth-child(8) { animation-delay: 0.4s; }
+            @keyframes staggerUp {
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Parallax image on mouse move
+        document.querySelectorAll('.parallax-img').forEach(img => {
+            const container = img.closest('.parallax-container') || img.parentElement;
+            container.addEventListener('mousemove', (e) => {
+                const rect = container.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width - 0.5;
+                const y = (e.clientY - rect.top) / rect.height - 0.5;
+                img.style.transform = `translate(${x * 15}px, ${y * 15}px)`;
+            });
+            container.addEventListener('mouseleave', () => {
+                img.style.transform = 'translate(0, 0)';
+                img.style.transition = 'transform 0.5s ease';
+            });
+        });
+
+        // Button press ripple
+        document.querySelectorAll('.btn-press').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const ripple = document.createElement('span');
+                const rect = btn.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height);
+                const x = e.clientX - rect.left - size / 2;
+                const y = e.clientY - rect.top - size / 2;
+                ripple.style.width = ripple.style.height = size + 'px';
+                ripple.style.left = x + 'px';
+                ripple.style.top = y + 'px';
+                ripple.classList.add('ripple');
+                btn.appendChild(ripple);
+                setTimeout(() => ripple.remove(), 600);
+            });
+        });
+
+        const rippleStyle = document.createElement('style');
+        rippleStyle.textContent = `
+            .btn-press { position: relative; overflow: hidden; }
+            .ripple {
+                position: absolute;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.4);
+                transform: scale(0);
+                animation: rippleAnim 0.6s linear;
+                pointer-events: none;
+            }
+            @keyframes rippleAnim {
+                to { transform: scale(4); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(rippleStyle);
+    </script>
+
+    {{-- ================= Chatbot penjualan (24/7) ================= --}}
+    <div id="chatWidget" class="chat-widget">
+        <button id="chatToggle" class="chat-fab" type="button" aria-label="Buka chat bantuan">
+            <span aria-hidden="true">💬</span>
+            <span id="chatBadge" class="chat-badge">1</span>
+        </button>
+
+        <section id="chatPanel" class="chat-panel" aria-hidden="true" aria-label="Chat bantuan">
+            <header class="chat-header">
+                <div class="chat-avatar" aria-hidden="true">🍰</div>
+                <div class="chat-heading">
+                    <div class="chat-title">Seana Assistant</div>
+                    <div class="chat-status"><span class="chat-dot"></span> Online 24/7</div>
+                </div>
+                <button id="chatClose" class="chat-close" type="button" aria-label="Tutup chat">&times;</button>
+            </header>
+
+            <div id="chatBody" class="chat-body" role="log" aria-live="polite"></div>
+            <div id="chatChips" class="chat-chips"></div>
+
+            <form id="chatForm" class="chat-form" autocomplete="off">
+                <input id="chatInput" type="text" name="message" maxlength="500" placeholder="Tulis pertanyaanmu..." aria-label="Pesan">
+                <button type="submit" class="chat-send" aria-label="Kirim">➤</button>
+            </form>
+        </section>
+    </div>
+
+    <script>
+    (function () {
+        const widget = document.getElementById('chatWidget');
+        const toggle = document.getElementById('chatToggle');
+        const panel  = document.getElementById('chatPanel');
+        const close  = document.getElementById('chatClose');
+        const body   = document.getElementById('chatBody');
+        const chips  = document.getElementById('chatChips');
+        const form   = document.getElementById('chatForm');
+        const input  = document.getElementById('chatInput');
+        const badge  = document.getElementById('chatBadge');
+
+        if (!widget || !toggle || !panel) return;
+
+        // Jika halaman punya tombol keranjang mengambang, naikkan posisi chat.
+        if (document.querySelector('.floating-cart')) {
+            widget.classList.add('chat-above-cart');
+        }
+
+        const endpoint = @json(route('chatbot.reply'));
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        const csrf = meta ? meta.content : '';
+        let started = false;
+        let busy = false;
+
+        function scrollBottom() {
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function addMessage(text, who) {
+            const row = document.createElement('div');
+            row.className = 'chat-msg chat-msg-' + who;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            bubble.textContent = text;
+
+            row.appendChild(bubble);
+            body.appendChild(row);
+            scrollBottom();
+            return row;
+        }
+
+        function addTyping() {
+            const row = document.createElement('div');
+            row.className = 'chat-msg chat-msg-bot chat-typing';
+            row.innerHTML = '<div class="chat-bubble"><span></span><span></span><span></span></div>';
+            body.appendChild(row);
+            scrollBottom();
+            return row;
+        }
+
+        function renderChips(list) {
+            chips.innerHTML = '';
+            (list || []).slice(0, 5).forEach(function (label) {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'chat-chip';
+                chip.textContent = label;
+                chip.addEventListener('click', function () { send(label); });
+                chips.appendChild(chip);
+            });
+            scrollBottom();
+        }
+
+        async function send(message) {
+            const text = String(message || '').trim();
+            if (!text || busy) return;
+
+            busy = true;
+            addMessage(text, 'user');
+            input.value = '';
+            chips.innerHTML = '';
+            const typing = addTyping();
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ message: text })
+                });
+
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+
+                const data = await res.json();
+                typing.remove();
+                addMessage(data.reply || 'Maaf, saya belum bisa menjawab saat ini.', 'bot');
+                renderChips(data.quick_replies || []);
+            } catch (err) {
+                typing.remove();
+                addMessage('Koneksi sedang bermasalah. Coba lagi sebentar, atau hubungi admin lewat WhatsApp.', 'bot');
+            } finally {
+                busy = false;
+                input.focus();
+            }
+        }
+
+        function openPanel() {
+            panel.classList.add('is-open');
+            panel.setAttribute('aria-hidden', 'false');
+            widget.classList.add('is-open');
+            if (badge) badge.style.display = 'none';
+
+            if (!started) {
+                started = true;
+                addMessage('Halo! 👋 Saya Seana Assistant, siap bantu 24/7.\n\nTanyakan harga produk, minta rekomendasi, cek ongkir, atau tanya cara pesan.', 'bot');
+                renderChips(['Lihat menu', 'Rekomendasi', 'Ongkir', 'Cara pesan']);
+            }
+            setTimeout(function () { input.focus(); }, 260);
+        }
+
+        function closePanel() {
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden', 'true');
+            widget.classList.remove('is-open');
+        }
+
+        toggle.addEventListener('click', function () {
+            if (panel.classList.contains('is-open')) {
+                closePanel();
+            } else {
+                openPanel();
+            }
+        });
+
+        close.addEventListener('click', closePanel);
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            send(input.value);
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && panel.classList.contains('is-open')) closePanel();
+        });
+
+        // Bisa dipanggil dari tombol lain di halaman.
+        window.seanaChat = {
+            open: openPanel,
+            send: function (message) { openPanel(); send(message); }
+        };
+    })();
+    </script>
+
+    {{-- Navbar floating pill: bayangan lebih tegas saat halaman di-scroll. --}}
+    <script>
+    (function () {
+        var bar = document.querySelector('.topbar');
+        if (!bar) return;
+
+        function sync() {
+            bar.classList.toggle('topbar-scrolled', window.scrollY > 8);
+        }
+
+        sync();
+        window.addEventListener('scroll', sync, { passive: true });
+    })();
+    </script>
 </body>
 </html>

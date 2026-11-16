@@ -15,17 +15,21 @@ class UserProfileController extends Controller
 
     public function update(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'no_wa' => 'nullable|string|max:20',
             'alamat' => 'nullable|string',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         $user = auth()->user();
         $user->update([
-            'name' => $request->name,
-            'no_wa' => $request->no_wa,
-            'alamat' => $request->alamat,
+            'name' => $validated['name'],
+            'no_wa' => $validated['no_wa'] ?? null,
+            'alamat' => $validated['alamat'] ?? null,
+            'latitude' => $validated['latitude'] ?? null,
+            'longitude' => $validated['longitude'] ?? null,
         ]);
 
         return redirect()->route('profil.index')->with('success', 'Profil berhasil diperbarui!');

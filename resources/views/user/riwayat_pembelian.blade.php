@@ -24,9 +24,9 @@
         </div>
     @else
         <!-- Daftar Riwayat Pembelian -->
-        <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 20px;" class="stagger scroll-reveal">
             @foreach($orders as $order)
-                <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 25px rgba(0,0,0,0.06); border: 1px solid #fce4ec;">
+                <div class="order-card hover-lift" style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 8px 25px rgba(0,0,0,0.06); border: 1px solid #fce4ec;">
                     <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #f5f5f5; padding-bottom: 15px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                         <div>
                             <div style="font-size: 13px; color: #999; margin-bottom: 5px;">Tanggal Pesanan</div>
@@ -85,34 +85,46 @@
                     <!-- Bagian Input Ulasan (Hanya jika Selesai) -->
                     @if($order->status == 'selesai')
                         <div style="margin-top: 25px; padding-top: 20px; border-top: 1px dashed #ddd;">
-                            @if($order->reviews->isEmpty())
+                            @php
+                                $reviewsByProduct = $order->reviews->keyBy('produk_id');
+                                $orderItems = $order->items->unique('produk_id');
+                            @endphp
+                            @if($orderItems->isNotEmpty())
                                 <h4 style="color: #6d4c41; margin-bottom: 15px; font-weight: 800;">Bagikan Pengalaman Anda</h4>
-                                <form action="{{ route('user.order.review', $order->id) }}" method="POST">
-                                    @csrf
-                                    <div style="margin-bottom: 15px;">
-                                        <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Rating:</label>
-                                        <select name="rating" required style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd; background: white;">
-                                            <option value="5">⭐⭐⭐⭐⭐ (Sangat Puas)</option>
-                                            <option value="4">⭐⭐⭐⭐ (Puas)</option>
-                                            <option value="3">⭐⭐⭐ (Cukup)</option>
-                                            <option value="2">⭐⭐ (Kurang)</option>
-                                            <option value="1">⭐ (Buruk)</option>
-                                        </select>
+                                @foreach($orderItems as $item)
+                                    @php $review = $reviewsByProduct->get($item->produk_id); @endphp
+                                    <div style="background: #fffaf7; border: 1px solid #ffe0d0; border-radius: 18px; padding: 20px; margin-bottom: 18px;">
+                                        <div style="font-weight: 800; color: #6d4c41; margin-bottom: 12px;">{{ $item->produk->nama_produk ?? 'Produk' }}</div>
+                                        @if($review)
+                                            <div style="background: #fdf5f7; padding: 15px; border-radius: 15px; border: 1px solid rgba(240,98,146,0.1);">
+                                                <div style="font-weight: 700; color: #6d4c41; margin-bottom: 5px;">Ulasan Anda:</div>
+                                                <div style="color: #fbc02d; font-size: 14px; margin-bottom: 5px;">
+                                                    @for($i = 0; $i < $review->rating; $i++) ⭐ @endfor
+                                                </div>
+                                                <div style="font-style: italic; color: #8d6e63; font-size: 14px;">"{{ $review->ulasan }}"</div>
+                                            </div>
+                                        @else
+                                            <form action="{{ route('user.order.review', [$order->id, $item->produk_id]) }}" method="POST">
+                                                @csrf
+                                                <div style="margin-bottom: 15px;">
+                                                    <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Rating:</label>
+                                                    <select name="rating" required style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd; background: white;">
+                                                        <option value="5">⭐⭐⭐⭐⭐ (Sangat Puas)</option>
+                                                        <option value="4">⭐⭐⭐⭐ (Puas)</option>
+                                                        <option value="3">⭐⭐⭐ (Cukup)</option>
+                                                        <option value="2">⭐⭐ (Kurang)</option>
+                                                        <option value="1">⭐ (Buruk)</option>
+                                                    </select>
+                                                </div>
+                                                <div style="margin-bottom: 15px;">
+                                                    <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Ulasan (Opsional):</label>
+                                                    <textarea name="ulasan" rows="3" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd;" placeholder="Ceritakan pendapat Anda tentang produk kami..."></textarea>
+                                                </div>
+                                                <button type="submit" style="background: #f06292; color: white; border: none; padding: 10px 20px; border-radius: 50px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 10px rgba(240,98,146,0.2);">Kirim Ulasan</button>
+                                            </form>
+                                        @endif
                                     </div>
-                                    <div style="margin-bottom: 15px;">
-                                        <label style="display: block; font-size: 14px; color: #666; margin-bottom: 8px; font-weight: 600;">Ulasan (Opsional):</label>
-                                        <textarea name="ulasan" rows="3" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd;" placeholder="Ceritakan pendapat Anda tentang produk kami..."></textarea>
-                                    </div>
-                                    <button type="submit" style="background: #f06292; color: white; border: none; padding: 10px 20px; border-radius: 50px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 10px rgba(240,98,146,0.2);">Kirim Ulasan</button>
-                                </form>
-                            @else
-                                <div style="background: #fdf5f7; padding: 15px; border-radius: 15px; border: 1px solid rgba(240,98,146,0.1);">
-                                    <div style="font-weight: 700; color: #6d4c41; margin-bottom: 5px;">Ulasan Anda:</div>
-                                    <div style="color: #fbc02d; font-size: 14px; margin-bottom: 5px;">
-                                        @for($i=0; $i<$order->reviews->first()->rating; $i++) ⭐ @endfor
-                                    </div>
-                                    <div style="font-style: italic; color: #8d6e63; font-size: 14px;">"{{ $order->reviews->first()->ulasan }}"</div>
-                                </div>
+                                @endforeach
                             @endif
                         </div>
                     @endif

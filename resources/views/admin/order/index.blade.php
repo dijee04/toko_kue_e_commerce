@@ -68,18 +68,23 @@
                                     <a href="{{ route('admin.order.show', $order->id) }}" class="btn btn-sm btn-info" style="background: var(--info); color: white;">
                                         <i class="fas fa-eye"></i> Detail
                                     </a>
+                                    @php $allowedStatuses = $order->adminAllowedStatuses(); @endphp
+                                    @if(empty($allowedStatuses))
+                                        <span title="Status ini dikelola kurir atau sudah final" style="color: #9e9e9e; font-size: 12px; font-weight: 700; white-space: nowrap;">
+                                            <i class="fas fa-lock"></i> {{ $order->statusLabel() }}
+                                        </span>
+                                    @else
                                     <form action="{{ route('admin.order.update_status', $order->id) }}" method="POST" style="margin: 0;">
                                         @csrf
                                         @method('PATCH')
-                                        <select name="status" onchange="this.form.submit()" class="form-control" style="padding: 4px 8px; border-radius: 4px; font-size: 13px; width: auto; height: 32px; min-width: 100px;">
-                                            <option value="baru" {{ $order->status == 'baru' ? 'selected' : '' }}>Baru</option>
-                                            <option value="disiapkan" {{ $order->status == 'disiapkan' ? 'selected' : '' }}>Disiapkan</option>
-                                            <option value="menunggu_kurir" {{ $order->status == 'menunggu_kurir' ? 'selected' : '' }}>Menunggu Kurir</option>
-                                            <option value="dikirim" {{ $order->status == 'dikirim' ? 'selected' : '' }}>Dikirim</option>
-                                            <option value="selesai" {{ $order->status == 'selesai' ? 'selected' : '' }}>Selesai</option>
-                                            <option value="dibatalkan" {{ $order->status == 'dibatalkan' ? 'selected' : '' }}>Batal</option>
+                                        <select name="status" required onchange="this.form.submit()" class="form-control" style="padding: 4px 8px; border-radius: 4px; font-size: 13px; width: auto; height: 32px; min-width: 110px;">
+                                            <option value="" selected disabled>Ubah...</option>
+                                            @foreach($allowedStatuses as $status)
+                                                <option value="{{ $status }}">{{ \App\Models\Order::statusLabelFor($status) }}</option>
+                                            @endforeach
                                         </select>
                                     </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

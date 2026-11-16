@@ -10,7 +10,7 @@ class KategoriController extends Controller
 {
     public function index()
     {
-        $kategoris = Kategori::latest()->get();
+        $kategoris = Kategori::latest()->paginate(15);
         return view('admin.kategori.index', compact('kategoris'));
     }
 
@@ -21,11 +21,9 @@ class KategoriController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        Kategori::create($request->validate([
             'nama_kategori' => 'required|string|max:255',
-        ]);
-
-        Kategori::create($request->all());
+        ]));
 
         return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil ditambahkan');
     }
@@ -37,17 +35,19 @@ class KategoriController extends Controller
 
     public function update(Request $request, Kategori $kategori)
     {
-        $request->validate([
+        $kategori->update($request->validate([
             'nama_kategori' => 'required|string|max:255',
-        ]);
-
-        $kategori->update($request->all());
+        ]));
 
         return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil diperbarui');
     }
 
     public function destroy(Kategori $kategori)
     {
+        if ($kategori->produks()->exists()) {
+            return back()->with('error', 'Kategori tidak dapat dihapus karena masih memiliki produk.');
+        }
+
         $kategori->delete();
         return redirect()->route('admin.kategori.index')->with('success', 'Kategori berhasil dihapus');
     }

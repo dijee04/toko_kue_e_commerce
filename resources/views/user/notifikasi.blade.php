@@ -185,18 +185,9 @@
 
         window.snap.pay(snapToken, {
             onSuccess: function(result){
-                fetch('{{ route("user.checkout.success_local") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ snap_token: snapToken })
-                }).then(() => {
-                    sessionStorage.setItem('payment_success_confetti', 'true');
-                    alert("Pembayaran berhasil diproses!");
-                    location.reload();
-                });
+                sessionStorage.setItem('payment_success_confetti', 'true');
+                alert("Pembayaran berhasil diproses!");
+                location.reload();
             },
             onPending: function(result){
                 alert("Menunggu pembayaran Anda diselesaikan!");

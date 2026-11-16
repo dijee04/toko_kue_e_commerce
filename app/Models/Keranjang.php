@@ -9,7 +9,13 @@ class Keranjang extends Model
 {
     use HasFactory;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'user_id',
+        'produk_id',
+        'jumlah',
+        'opsi',
+        'total_harga',
+    ];
 
     protected $casts = [
         'opsi' => 'array',

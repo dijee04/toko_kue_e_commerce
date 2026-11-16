@@ -17,3 +17,16 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# File sampah / artefak lokal yang tidak boleh masuk repo
+cookie.txt
+routes.txt
+*.zip
+*.sql
+*.log
+/public/uploads
+
+# Catatan & aset kerja lokal
+/.opencode
+/AGENTS.md
+/Katalog Dear Seana.pdf

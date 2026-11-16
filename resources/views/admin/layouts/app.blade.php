@@ -14,6 +14,7 @@
     
     <!-- Admin Custom CSS -->
     <link rel="stylesheet" href="{{ asset('assets/admin/css/style.css') }}">
+    @include('partials.favicon')
 </head>
 <body>
 

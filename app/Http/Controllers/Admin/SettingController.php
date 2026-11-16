@@ -28,7 +28,7 @@ class SettingController extends Controller
 
     public function update(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'wa_number' => 'required|string',
             'bank_name' => 'required|string',
             'bank_account' => 'required|string',
@@ -40,7 +40,12 @@ class SettingController extends Controller
         ]);
 
         $setting = Setting::first();
-        $setting->update($request->all());
+
+        if (!$setting) {
+            Setting::create($validated);
+        } else {
+            $setting->update($validated);
+        }
 
         return back()->with('success', 'Pengaturan berhasil diperbarui!');
     }

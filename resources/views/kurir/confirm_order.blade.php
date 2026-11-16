@@ -323,6 +323,7 @@
             margin-top: auto;
         }
     </style>
+    @include('partials.favicon')
 </head>
 <body>
 
@@ -392,8 +393,8 @@
                 </div>
                 
                 <!-- Map Container -->
-                <div id="map-container" style="border-radius: 12px; overflow: hidden; border: 1px solid #fce4ec; position: relative; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-                    <div id="map" style="height: 250px; width: 100%; z-index: 1;"></div>
+                <div id="map-container" style="border-radius: 12px; overflow: hidden; border: 1px solid #fce4ec; position: relative; z-index: 0; isolation: isolate; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                    <div id="map" style="height: 250px; width: 100%; position: relative; z-index: 0;"></div>
                 </div>
             </div>
 
@@ -458,20 +459,11 @@
                 attribution: '© OpenStreetMap'
             }).addTo(mapInstance);
 
-            const alamat = {!! json_encode($order->alamat) !!};
+            const alamat = @json($order->alamat);
+            const orderLat = @json($order->latitude);
+            const orderLng = @json($order->longitude);
 
-            // Forward Geocoding via Nominatim
-            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(alamat)}&limit=1`)
-                .then(response => response.json())
-                .then(data => {
-                    let destLat = RESTO_LAT;
-                    let destLng = RESTO_LNG;
-
-                    if (data && data.length > 0) {
-                        destLat = parseFloat(data[0].lat);
-                        destLng = parseFloat(data[0].lon);
-                    }
-
+            const renderRoute = (destLat, destLng) => {
                     L.Routing.control({
                         waypoints: [
                             L.latLng(RESTO_LAT, RESTO_LNG),
@@ -506,10 +498,29 @@
                             styles: [{color: '#4caf50', opacity: 0.8, weight: 6}]
                         }
                     }).addTo(mapInstance);
-                })
-                .catch(err => {
-                    console.error("Geocoding failed", err);
-                });
+            };
+
+            if (orderLat !== null && orderLng !== null) {
+                // Titik koordinat sudah ditentukan pelanggan
+                renderRoute(parseFloat(orderLat), parseFloat(orderLng));
+            } else {
+                // Fallback: forward geocoding alamat via Nominatim
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(alamat)}&limit=1`)
+                    .then(response => response.json())
+                    .then(data => {
+                        let destLat = RESTO_LAT;
+                        let destLng = RESTO_LNG;
+                        if (data && data.length > 0) {
+                            destLat = parseFloat(data[0].lat);
+                            destLng = parseFloat(data[0].lon);
+                        }
+                        renderRoute(destLat, destLng);
+                    })
+                    .catch(err => {
+                        console.error("Geocoding failed", err);
+                        renderRoute(RESTO_LAT, RESTO_LNG);
+                    });
+            }
         });
     </script>
 </body>

@@ -15,7 +15,9 @@
     @php
         // Gambar fallback yang premium
         if($produk->gambar && !str_starts_with($produk->gambar, 'http')) {
-            if (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/')) {
+            if (str_starts_with($produk->gambar, 'assets/')) {
+                $imageUrl = asset($produk->gambar);
+            } elseif (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/')) {
                 $imageUrl = asset('assets/img_produk/' . ltrim($produk->gambar, '/'));
             } else {
                 $imageUrl = asset('storage/' . $produk->gambar);
@@ -26,47 +28,10 @@
             $imageUrl = 'https://picsum.photos/seed/' . $produk->id . '/600/400';
         }
 
-        // Definisikan opsi tambahan dinamis berdasarkan kategori/nama produk
-        $options = [];
-        $isCake = false;
-        $kategoriNama = strtolower($produk->kategori->nama_kategori ?? '');
-        $produkNama = strtolower($produk->nama_produk ?? '');
-        
-        if (str_contains($kategoriNama, 'cake') || str_contains($kategoriNama, 'ulang tahun') || str_contains($produkNama, 'cake') || str_contains($produkNama, 'tart')) {
-            $isCake = true;
-        }
-
-        if ($isCake) {
-            $options = [
-                [
-                    'key' => 'ukuran',
-                    'label' => 'Pilih Ukuran Kue',
-                    'type' => 'radio',
-                    'choices' => ['Personal Size 10cm (+0k)', 'Medium Size 16cm (+50k)', 'Family Size 22cm (+120k)']
-                ],
-                [
-                    'key' => 'lilin_kartu',
-                    'label' => 'Lilin & Kartu Ucapan',
-                    'type' => 'radio',
-                    'choices' => ['Tanpa Lilin & Kartu (+0k)', 'Lilin Batang & Kartu (+5k)', 'Lilin Angka & Kartu Ucapan (+10k)']
-                ]
-            ];
-        } else {
-            $options = [
-                [
-                    'key' => 'varian',
-                    'label' => 'Pilih Varian Rasa',
-                    'type' => 'radio',
-                    'choices' => ['Original Sweet (+0k)', 'Double Choco Premium (+15k)', 'Matcha Velvet Cream (+20k)']
-                ],
-                [
-                    'key' => 'kemasan',
-                    'label' => 'Pilih Kemasan',
-                    'type' => 'radio',
-                    'choices' => ['Kemasan Box Premium (+0k)', 'Kemasan Hampers Keranjang (+45k)']
-                ]
-            ];
-        }
+        // Aturan opsi dipusatkan di App\Support\ProdukOptions agar
+        // harga yang dihitung server sama dengan yang tampil di halaman.
+        $isCake = \App\Support\ProdukOptions::isCake($produk);
+        $options = \App\Support\ProdukOptions::for($produk);
 
         // Gambar Varian Mock untuk galeri visual premium
         $variantImages = [];
@@ -87,38 +52,6 @@
         // Siapkan ulasan untuk ditampilkan
         $displayReviews = $reviews;
         $actualReviewCount = $reviews->count();
-        
-        if ($displayReviews->isEmpty()) {
-            // Mock reviews agar halaman terlihat sangat premium & lengkap pada fase development
-            $displayReviews = collect([
-                (object)[
-                    'id' => 101,
-                    'rating' => 5,
-                    'ulasan' => 'Luar biasa enak! Coklatnya sangat pekat, manisnya pas dan tidak bikin enek. Tekstur kuenya sangat lembut layaknya kapas. Sangat direkomendasikan untuk acara ulang tahun maupun camilan keluarga. Pengiriman juga super cepat dan aman sampai tujuan. Terima kasih Dear Seana! 🎂✨',
-                    'created_at' => now()->subDays(2),
-                    'user' => (object)['name' => 'Aditya Wijaya'],
-                    'selections' => $isCake ? ['ukuran' => 'Medium Size 16cm (+50k)', 'lilin_kartu' => 'Lilin Angka & Kartu Ucapan (+10k)'] : ['varian' => 'Double Choco Premium (+15k)']
-                ],
-                (object)[
-                    'id' => 102,
-                    'rating' => 5,
-                    'ulasan' => 'Rasanya benar-benar premium, tidak kalah dengan toko kue bintang lima. Beli yang ukuran sedang untuk merayakan anniversary bersama suami, kami berdua sangat menyukainya. Kemasan boxnya tebal, mewah, dan kokoh. Sukses selalu, pasti langganan!',
-                    'created_at' => now()->subDays(5),
-                    'user' => (object)['name' => 'Siti Rahmawati'],
-                    'selections' => $isCake ? ['ukuran' => 'Medium Size 16cm (+50k)'] : ['varian' => 'Original Sweet (+0k)', 'kemasan' => 'Kemasan Box Premium (+0k)']
-                ],
-                (object)[
-                    'id' => 103,
-                    'rating' => 4,
-                    'ulasan' => 'Kualitas rasa bahan premiumnya terasa sekali. Tingkat manisnya pas sekali di lidah. Hanya kemarin kurirnya terlambat sekitar 10 menit karena hujan deras, tapi kue tetap sampai dengan bentuk sempurna karena packing super aman dengan wrap dobel.',
-                    'created_at' => now()->subWeeks(1),
-                    'user' => (object)['name' => 'Budi Santoso'],
-                    'selections' => $isCake ? ['ukuran' => 'Personal Size 10cm (+0k)'] : ['varian' => 'Original Sweet (+0k)']
-                ]
-            ]);
-            $averageRating = 4.7;
-            $reviewCount = 3;
-        }
     @endphp
 
     <!-- Main Detail Container -->
@@ -127,8 +60,8 @@
             
             <!-- Left Column: Product Gallery -->
             <div class="gallery-column">
-                <div class="main-image-container" style="position: relative; overflow: hidden; border-radius: 30px; background: linear-gradient(135deg, #fce4ec, #f8bbd0); box-shadow: 0 15px 35px rgba(0,0,0,0.06); height: 480px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0,0,0,0.05);">
-                    <img id="mainProductImage" src="{{ $imageUrl }}" alt="{{ $produk->nama_produk }}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;">
+                <div class="main-image-container parallax-container" style="position: relative; overflow: hidden; border-radius: 30px; background: linear-gradient(135deg, #fce4ec, #f8bbd0); box-shadow: 0 15px 35px rgba(0,0,0,0.06); height: 480px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0,0,0,0.05);">
+                    <img id="mainProductImage" src="{{ $imageUrl }}" alt="{{ $produk->nama_produk }}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;" class="parallax-img">
                     <div class="best-seller-badge" style="position: absolute; top: 25px; left: 25px; background: linear-gradient(135deg, #f06292, #ec407a); color: white; padding: 8px 18px; border-radius: 50px; font-size: 13px; font-weight: 800; box-shadow: 0 6px 15px rgba(240,98,146,0.3); z-index: 2; animation: bounce 2s infinite;">
                         ✨ Best Seller
                     </div>
@@ -176,14 +109,22 @@
                             <span style="font-weight: 800; text-decoration: underline; font-size: 17px;">{{ $reviewCount }}</span> <span style="color: #8d6e63; font-weight: 600;">Penilaian</span>
                         </div>
                         <div style="color: #6d4c41;">
-                            <span style="font-weight: 800; font-size: 17px;">100+</span> <span style="color: #8d6e63; font-weight: 600;">Terjual</span>
+                            @if((int) $produk->terjual > 0)
+                                <span style="font-weight: 800; font-size: 17px;">{{ (int) $produk->terjual }}+</span> <span style="color: #8d6e63; font-weight: 600;">Terjual</span>
+                            @else
+                                <span style="font-weight: 800; font-size: 17px;">✨ Baru</span>
+                            @endif
                         </div>
                     </div>
                     
                     <!-- Price Card -->
                     <div style="background: linear-gradient(135deg, #fff5f8, #fff0f5); border-radius: 24px; padding: 22px 28px; margin-bottom: 30px; border: 1px solid rgba(240,98,146,0.12); display: flex; align-items: center; gap: 15px;">
                         <span id="productBasePriceDisplay" style="font-size: 38px; font-weight: 900; color: #f06292;">
-                            Rp {{ number_format($produk->harga, 0, ',', '.') }}
+                            @if($produk->harga > 0)
+                                Rp {{ number_format($produk->harga, 0, ',', '.') }}
+                            @else
+                                Hubungi Admin
+                            @endif
                         </span>
                         @if($produk->is_promo)
                             <span style="text-decoration: line-through; color: #bcaaa4; font-size: 18px; font-weight: 600;">
@@ -229,7 +170,6 @@
                                 <span id="detailQtyValue" style="font-size: 20px; font-weight: 900; min-width: 40px; text-align: center; color: #6d4c41;">1</span>
                                 <button type="button" id="detailQtyPlus" style="width: 34px; height: 34px; border-radius: 50%; border: none; background: linear-gradient(135deg, #fce4ec, #f8bbd0); color: #f06292; font-size: 20px; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;">+</button>
                             </div>
-                            <span style="font-size: 14px; color: #8d6e63; font-weight: 600;">Stok tersedia: 15 porsi</span>
                         </div>
                     </div>
                 </div>
@@ -238,15 +178,27 @@
                 <div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-top: 15px; border-top: 1px solid #f0e0d0;">
                         <span style="font-weight: 800; color: #6d4c41; font-size: 16px;">Subtotal:</span>
-                        <span id="detailSubtotalDisplay" style="font-size: 30px; font-weight: 900; color: #f06292;">Rp {{ number_format($produk->harga, 0, ',', '.') }}</span>
+                        <span id="detailSubtotalDisplay" style="font-size: 30px; font-weight: 900; color: #f06292;">
+                            @if($produk->harga > 0)
+                                Rp {{ number_format($produk->harga, 0, ',', '.') }}
+                            @else
+                                Hubungi Admin
+                            @endif
+                        </span>
                     </div>
                     <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <button id="detailAddToCartBtn" style="flex: 1.1; padding: 18px 24px; border-radius: 50px; border: 2px solid #b2dfdb; background: #e0f2f1; color: #00695c; font-weight: 800; font-size: 15px; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 15px rgba(0,105,92,0.1);">
-                            <i class="fas fa-cart-plus" style="font-size: 17px;"></i> Masukkan Keranjang
-                        </button>
-                        <button id="detailOrderNowBtn" style="flex: 1; padding: 18px 24px; border-radius: 50px; border: none; background: linear-gradient(135deg, #f06292, #ec407a); color: white; font-weight: 800; font-size: 15px; cursor: pointer; transition: all 0.3s; box-shadow: 0 6px 18px rgba(240,98,146,0.3); display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
-                            ⚡ Beli Sekarang
-                        </button>
+                        @if($produk->harga > 0)
+                            <button id="detailAddToCartBtn" style="flex: 1.1; padding: 18px 24px; border-radius: 50px; border: 2px solid #b2dfdb; background: #e0f2f1; color: #00695c; font-weight: 800; font-size: 15px; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 15px rgba(0,105,92,0.1);">
+                                <i class="fas fa-cart-plus" style="font-size: 17px;"></i> Masukkan Keranjang
+                            </button>
+                            <button id="detailOrderNowBtn" style="flex: 1; padding: 18px 24px; border-radius: 50px; border: none; background: linear-gradient(135deg, #f06292, #ec407a); color: white; font-weight: 800; font-size: 15px; cursor: pointer; transition: all 0.3s; box-shadow: 0 6px 18px rgba(240,98,146,0.3); display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                                ⚡ Beli Sekarang
+                            </button>
+                        @else
+                            <a href="https://wa.me/6285121111397?text={{ rawurlencode('Halo Dear Seana, saya ingin menanyakan harga ' . $produk->nama_produk) }}" target="_blank" rel="noopener" style="flex: 1; padding: 18px 24px; border-radius: 50px; background: linear-gradient(135deg, #25D366, #128C7E); color: white; font-weight: 800; font-size: 15px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 6px 18px rgba(37,211,102,0.3);">
+                                💬 Tanya Harga via WhatsApp
+                            </a>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -347,6 +299,13 @@
                 
                 <!-- Reviews List -->
                 <div class="reviews-list-container" id="reviewsList">
+                    @if($displayReviews->isEmpty())
+                        <div style="text-align: center; padding: 45px 20px; color: #a1887f;">
+                            <div style="font-size: 46px; margin-bottom: 10px;">💬</div>
+                            <div style="font-weight: 800; color: #6d4c41; font-size: 16px; margin-bottom: 5px;">Belum ada ulasan</div>
+                            <div style="font-size: 14px;">Jadilah yang pertama mengulas produk ini setelah membeli.</div>
+                        </div>
+                    @endif
                     @foreach($displayReviews as $rev)
                         <div class="review-item-card" data-rating="{{ $rev->rating }}" style="border-bottom: 1px solid #ffe0d0; padding: 25px 0; display: flex; gap: 20px; transition: all 0.3s;">
                             <!-- Avatar -->
@@ -597,12 +556,12 @@
         let selectedPaymentMethod = 'bank';
         let currentProduct = {
             id: {{ $produk->id }},
-            nama_produk: {!! json_encode($produk->nama_produk) !!},
-            deskripsi: {!! json_encode($produk->deskripsi ?: 'Nikmati hidangan manis premium') !!},
+            nama_produk: @json($produk->nama_produk),
+            deskripsi: @json($produk->deskripsi ?: 'Nikmati hidangan manis premium'),
             harga: {{ $produk->harga }},
-            options: {!! json_encode($options) !!},
-            gambar: {!! json_encode($imageUrl) !!},
-            variant_images: {!! json_encode($variantImages) !!}
+            options: @json($options),
+            gambar: @json($imageUrl),
+            variant_images: @json($variantImages)
         };
 
         let currentSelections = {};
@@ -813,7 +772,43 @@
 
             // ========== LOCAL STORAGE CART UTILITIES ==========
             function loadCartFromStorage() {
-                const savedCart = localStorage.getItem('sweetSavoryCart');
+                // Saat baru login, pindahkan isi keranjang tamu (guest) ke keranjang akun ini,
+                // lalu hapus keranjang tamu agar tidak terbawa/tercampur ke akun lain.
+                if (window.CART_USER_SCOPE && window.CART_USER_SCOPE !== 'guest') {
+                    try {
+                        const guestRaw = localStorage.getItem('sweetSavoryCart_guest');
+                        if (guestRaw) {
+                            const guestCart = JSON.parse(guestRaw) || [];
+                            const accountCart = JSON.parse(localStorage.getItem(window.CART_KEY) || '[]');
+                            guestCart.forEach(function (g) {
+                                const idx = accountCart.findIndex(function (x) {
+                                    return x.id === g.id && JSON.stringify(x.selections) === JSON.stringify(g.selections);
+                                });
+                                if (idx !== -1) {
+                                    accountCart[idx].quantity += g.quantity;
+                                    accountCart[idx].total_price += g.total_price;
+                                } else {
+                                    accountCart.push(g);
+                                }
+                            });
+                            localStorage.setItem(window.CART_KEY, JSON.stringify(accountCart));
+                            localStorage.removeItem('sweetSavoryCart_guest');
+                        }
+                    } catch (e) {
+                        console.error('migrateGuestCart error:', e);
+                    }
+                }
+
+                // Tamu tidak boleh punya isi keranjang: wajib login dulu.
+                if (!window.IS_AUTH) {
+                    cart = [];
+                    localStorage.removeItem(window.CART_KEY);
+                    localStorage.removeItem(window.GALLERY_CART_KEY);
+                    updateCartBadge();
+                    return;
+                }
+
+                const savedCart = localStorage.getItem(window.CART_KEY);
                 if (savedCart) {
                     cart = JSON.parse(savedCart);
                     updateCartBadge();
@@ -842,7 +837,17 @@
                 }
             }
 
+            function requireLogin() {
+                if (window.IS_AUTH) return true;
+
+                showToastMessage('🔒 Silakan login dulu untuk memesan');
+                setTimeout(function () { window.location.href = window.LOGIN_URL; }, 700);
+                return false;
+            }
+
             function addToCart(product, selections, quantity) {
+                if (!requireLogin()) return;
+
                 const cartItem = {
                     id: product.id,
                     name: product.nama_produk,
@@ -864,7 +869,7 @@
                     cart.push(cartItem);
                 }
                 
-                localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                 showToastMessage('🛒 Kue manis dimasukkan keranjang! ✨');
                 updateCartBadge();
                 animateCart();
@@ -880,18 +885,26 @@
             }
 
             // ========== ATTACH PRIMARY BUTTONS CLICK HANDLERS ==========
-            document.getElementById('detailAddToCartBtn').addEventListener('click', function() {
-                addToCart(currentProduct, currentSelections, currentQuantity);
-            });
+            const addToCartBtn = document.getElementById('detailAddToCartBtn');
+            if (addToCartBtn) {
+                addToCartBtn.addEventListener('click', function() {
+                    addToCart(currentProduct, currentSelections, currentQuantity);
+                });
+            }
 
-            document.getElementById('detailOrderNowBtn').addEventListener('click', function() {
-                showBuyNowModal();
-            });
+            const orderNowBtn = document.getElementById('detailOrderNowBtn');
+            if (orderNowBtn) {
+                orderNowBtn.addEventListener('click', function() {
+                    showBuyNowModal();
+                });
+            }
 
             // ========== INSTANT DIRECT CHECKOUT (MIDTRANS) ==========
-            let savedCustName = {!! json_encode(auth()->check() ? auth()->user()->name : '') !!};
-            let savedCustPhone = {!! json_encode(auth()->check() ? auth()->user()->no_wa : '') !!};
-            let savedCustAddress = {!! json_encode(auth()->check() ? auth()->user()->alamat : '') !!};
+            let savedCustName = @json(auth()->check() ? auth()->user()->name : '');
+            let savedCustPhone = @json(auth()->check() ? auth()->user()->no_wa : '');
+            let savedCustAddress = @json(auth()->check() ? auth()->user()->alamat : '');
+            let savedCustLat = @json(auth()->check() ? auth()->user()->latitude : null);
+            let savedCustLng = @json(auth()->check() ? auth()->user()->longitude : null);
 
             async function initiateInstantCheckout(ongkir = 0) {
                 const subtotal = calculateCurrentSubtotal();
@@ -911,6 +924,8 @@
                     nama_pelanggan: savedCustName || 'Pelanggan',
                     no_wa: savedCustPhone || '08000000000',
                     alamat: savedCustAddress || '-',
+                    latitude: window.checkoutLat ?? savedCustLat ?? null,
+                    longitude: window.checkoutLng ?? savedCustLng ?? null,
                     metode_pembayaran: 'Midtrans',
                     items: JSON.stringify(singleItem),
                     total_harga: total,
@@ -928,6 +943,12 @@
                         body: JSON.stringify(payload)
                     });
                     
+                    if (response.status === 401 || response.status === 419 || response.redirected) {
+                        showToastMessage('🔒 Silakan login dulu untuk memesan');
+                        setTimeout(function () { window.location.href = window.LOGIN_URL; }, 700);
+                        return;
+                    }
+
                     const result = await response.json();
                     if (!result.success) {
                         alert("Gagal memproses pesanan ke database: " + result.message);
@@ -937,21 +958,21 @@
                     // Buka Snap Midtrans
                     window.snap.pay(result.snap_token, {
                         onSuccess: function(snapResult){
-                            fetch('{{ route("user.checkout.success_local") }}', {
+                            sessionStorage.setItem('payment_success_confetti', 'true');
+                            showToastMessage('✅ Pembayaran berhasil diproses!');
+                            fetch("{{ route('user.checkout.success_local') }}", {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                                 },
                                 body: JSON.stringify({ snap_token: result.snap_token })
-                            }).then(() => {
-                                sessionStorage.setItem('payment_success_confetti', 'true');
-                                showToastMessage('✅ Pembayaran berhasil diproses!');
+                            }).catch(() => {}).finally(() => {
                                 // Bersihkan cart
                                 cart = [];
-                                localStorage.removeItem('sweetSavoryCart');
+                                localStorage.removeItem(window.CART_KEY);
                                 updateCartBadge();
-                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 2000);
+                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 1500);
                             });
                         },
                         onPending: function(snapResult){
@@ -974,11 +995,13 @@
 
             // ========== MODAL BELI SEKARANG (DENGAN PETA) ==========
             function showBuyNowModal() {
+                if (!requireLogin()) return;
+
                 const total = calculateCurrentSubtotal();
                 let buyNowHtml = `
                     <div id="buyNowModal" class="order-modal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); z-index: 10001; align-items: center; justify-content: center; font-family: 'Outfit', sans-serif;">
                         <div class="modal-content" style="background: linear-gradient(145deg, #FFF8F0, #FFF5EE); border-radius: 48px; max-width: 680px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 35px 70px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.7); animation: fadeIn 0.4s ease;">
-                            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: relative;">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: relative; z-index: 20;">
                                 <h3 style="color: #6d4c41; margin: 0; font-size: 26px; font-weight: 900;">⚡ Beli Sekarang</h3>
                                 <button class="buy-modal-close" style="position: absolute; right: 28px; top: 24px; background: rgba(255,255,255,0.95); border: none; font-size: 28px; cursor: pointer; color: #6d4c41; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s;">&times;</button>
                             </div>
@@ -1028,8 +1051,8 @@
                                         </div>
                                     </div>
                                     
-                                    <div id="map-container" style="margin-top: 15px; border-radius: 12px; overflow: hidden; border: 1px solid #f0d0d0; position: relative;">
-                                        <div id="map" style="height: 250px; width: 100%; z-index: 1;"></div>
+                                    <div id="map-container" style="margin-top: 15px; border-radius: 12px; overflow: hidden; border: 1px solid #f0d0d0; position: relative; z-index: 0; isolation: isolate;">
+                                        <div id="map" style="height: 250px; width: 100%; position: relative; z-index: 0;"></div>
                                     </div>
                                 </div>
                             </div>
@@ -1088,6 +1111,8 @@
 
             // ========== REUSE THE BEAUTIFUL CART MODAL POPUP FROM MENU.BLADE.PHP ==========
             function showCartModal() {
+                if (!requireLogin()) return;
+
                 if (cart.length === 0) {
                     showToastMessage('✨ Keranjang belanja masih kosong');
                     return;
@@ -1104,7 +1129,7 @@
                 let cartHtml = `
                     <div id="cartModal" class="order-modal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); z-index: 10001; align-items: center; justify-content: center; font-family: 'Outfit', sans-serif;">
                         <div class="modal-content" style="background: linear-gradient(145deg, #FFF8F0, #FFF5EE); border-radius: 48px; max-width: 680px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 35px 70px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.7); animation: fadeIn 0.4s ease;">
-                            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: relative;">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #fce4ec, #f8bbd0); padding: 28px; border-radius: 48px 48px 0 0; position: relative; z-index: 20;">
                                 <h3 style="color: #6d4c41; margin: 0; font-size: 26px; font-weight: 900;">🛒 Keranjang Belanja</h3>
                                 <button class="cart-modal-close" style="position: absolute; right: 28px; top: 24px; background: rgba(255,255,255,0.95); border: none; font-size: 28px; cursor: pointer; color: #6d4c41; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s;">&times;</button>
                             </div>
@@ -1179,7 +1204,7 @@
                 
                 clearBtn.addEventListener('click', () => {
                     cart = [];
-                    localStorage.removeItem('sweetSavoryCart');
+                    localStorage.removeItem(window.CART_KEY);
                     updateCartBadge();
                     cartModal.remove();
                     document.body.style.overflow = '';
@@ -1198,12 +1223,12 @@
                         if (cart[index].quantity > 1) {
                             cart[index].quantity--;
                             cart[index].total_price = calculateTotalPriceForCartItem(cart[index]);
-                            localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                            localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                             updateCartBadge();
                             showCartModal();
                         } else {
                             cart.splice(index, 1);
-                            localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                            localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                             updateCartBadge();
                             if (cart.length === 0) {
                                 cartModal.remove();
@@ -1221,7 +1246,7 @@
                         const index = parseInt(btn.dataset.index);
                         cart[index].quantity++;
                         cart[index].total_price = calculateTotalPriceForCartItem(cart[index]);
-                        localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                        localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                         updateCartBadge();
                         showCartModal();
                     });
@@ -1231,7 +1256,7 @@
                     btn.addEventListener('click', (e) => {
                         const index = parseInt(btn.dataset.index);
                         cart.splice(index, 1);
-                        localStorage.setItem('sweetSavoryCart', JSON.stringify(cart));
+                        localStorage.setItem(window.CART_KEY, JSON.stringify(cart));
                         updateCartBadge();
                         if (cart.length === 0) {
                             cartModal.remove();
@@ -1252,6 +1277,8 @@
             }
 
             async function sendCartToMidtransWithPayment() {
+                if (!requireLogin()) return;
+
                 if (cart.length === 0) {
                     showToastMessage('Keranjang kosong');
                     return;
@@ -1319,6 +1346,8 @@
                     nama_pelanggan: namaPelanggan,
                     no_wa: noWaPelanggan,
                     alamat: alamatPelanggan,
+                    latitude: window.checkoutLat ?? savedCustLat ?? null,
+                    longitude: window.checkoutLng ?? savedCustLng ?? null,
                     metode_pembayaran: 'Midtrans',
                     items: JSON.stringify(cart),
                     total_harga: grandTotal,
@@ -1336,6 +1365,12 @@
                         body: JSON.stringify(payload)
                     });
                     
+                    if (response.status === 401 || response.status === 419 || response.redirected) {
+                        showToastMessage('🔒 Silakan login dulu untuk memesan');
+                        setTimeout(function () { window.location.href = window.LOGIN_URL; }, 700);
+                        return;
+                    }
+
                     const result = await response.json();
                     if (!result.success) {
                         alert("Gagal memproses pesanan ke database: " + result.message);
@@ -1345,29 +1380,29 @@
                     // Snap Midtrans checkout
                     window.snap.pay(result.snap_token, {
                         onSuccess: function(snapResult){
-                            fetch('{{ route("user.checkout.success_local") }}', {
+                            sessionStorage.setItem('payment_success_confetti', 'true');
+                            showToastMessage('✅ Pembayaran berhasil diproses!');
+                            fetch("{{ route('user.checkout.success_local') }}", {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                                 },
                                 body: JSON.stringify({ snap_token: result.snap_token })
-                            }).then(() => {
-                                sessionStorage.setItem('payment_success_confetti', 'true');
-                                showToastMessage('✅ Pembayaran berhasil diproses!');
+                            }).catch(() => {}).finally(() => {
                                 cart = [];
-                                localStorage.removeItem('sweetSavoryCart');
+                                localStorage.removeItem(window.CART_KEY);
                                 savedCustName = '';
                                 savedCustPhone = '';
                                 savedCustAddress = '';
                                 updateCartBadge();
-                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 2000);
+                                setTimeout(() => window.location.href = "{{ route('pesanan_saya') }}", 1500);
                             });
                         },
                         onPending: function(snapResult){
                             showToastMessage('⏳ Silakan selesaikan pembayaran Anda.');
                             cart = [];
-                            localStorage.removeItem('sweetSavoryCart');
+                            localStorage.removeItem(window.CART_KEY);
                             savedCustName = '';
                             savedCustPhone = '';
                             savedCustAddress = '';
@@ -1423,10 +1458,16 @@
                     attribution: '© OpenStreetMap'
                 }).addTo(mapInstance);
 
+                const destLat = (savedCustLat !== null && savedCustLng !== null) ? savedCustLat : RESTO_LAT;
+                const destLng = (savedCustLat !== null && savedCustLng !== null) ? savedCustLng : RESTO_LNG;
+                if (savedCustLat !== null && savedCustLng !== null) {
+                    window.checkoutLat = savedCustLat;
+                    window.checkoutLng = savedCustLng;
+                }
                 routingControl = L.Routing.control({
                     waypoints: [
                         L.latLng(RESTO_LAT, RESTO_LNG),
-                        L.latLng(RESTO_LAT, RESTO_LNG)
+                        L.latLng(destLat, destLng)
                     ],
                     routeWhileDragging: true,
                     showAlternatives: false,
@@ -1557,6 +1598,8 @@
         }
 
         function updateAddressFromMarker(lat, lng) {
+            window.checkoutLat = lat;
+            window.checkoutLng = lng;
             const destText = document.getElementById('routing-tujuan-text');
             if(destText) destText.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
             

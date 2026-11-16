@@ -563,6 +563,7 @@
             padding: 2rem;
         }
     </style>
+    @include('partials.favicon')
 </head>
 
 <body>

@@ -15,6 +15,7 @@
         .btn:hover { background-color: #6b4131; }
         .error { color: #dc3545; font-size: 14px; margin-top: 5px; margin-bottom: 15px; }
     </style>
+    @include('partials.favicon')
 </head>
 <body>
 
