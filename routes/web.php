@@ -21,6 +21,18 @@ Route::post('/chatbot', [\App\Http\Controllers\ChatbotController::class, 'reply'
     ->middleware('throttle:40,1')
     ->name('chatbot.reply');
 
+// Sajikan file storage publik tanpa symlink (kompatibel shared hosting).
+Route::get('/storage/{path}', function (string $path) {
+    abort_if(str_contains($path, '..'), 404);
+
+    $base = realpath(storage_path('app/public'));
+    $file = realpath(storage_path('app/public/' . $path));
+
+    abort_unless($base && $file && str_starts_with($file, $base) && is_file($file), 404);
+
+    return response()->file($file);
+})->where('path', '.*')->name('storage.public');
+
 /*
 |--------------------------------------------------------------------------
 | Auth (PUBLIK)
