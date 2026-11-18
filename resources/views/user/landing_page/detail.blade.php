@@ -13,20 +13,8 @@
     </div>
 
     @php
-        // Gambar fallback yang premium
-        if($produk->gambar && !str_starts_with($produk->gambar, 'http')) {
-            if (str_starts_with($produk->gambar, 'assets/')) {
-                $imageUrl = asset($produk->gambar);
-            } elseif (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/')) {
-                $imageUrl = asset('assets/img_produk/' . ltrim($produk->gambar, '/'));
-            } else {
-                $imageUrl = asset('storage/' . $produk->gambar);
-            }
-        } elseif($produk->gambar && str_starts_with($produk->gambar, 'http')) {
-            $imageUrl = $produk->gambar;
-        } else {
-            $imageUrl = 'https://picsum.photos/seed/' . $produk->id . '/600/400';
-        }
+        // Resolusi gambar dipusatkan di App\Support\ProdukImage
+        $imageUrl = \App\Support\ProdukImage::url($produk->gambar);
 
         // Aturan opsi dipusatkan di App\Support\ProdukOptions agar
         // harga yang dihitung server sama dengan yang tampil di halaman.
@@ -55,7 +43,7 @@
     @endphp
 
     <!-- Main Detail Container -->
-    <div style="max-width: 1400px; margin: 40px auto; padding: 0 25px; font-family: 'Outfit', sans-serif;">
+    <div class="detail-wrap" style="max-width: 1400px; margin: 40px auto; padding: 0 25px; font-family: 'Outfit', sans-serif;">
         <div class="product-layout" style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 50px; background: rgba(255, 255, 255, 0.95); border-radius: 40px; padding: 40px; box-shadow: 0 25px 60px rgba(0,0,0,0.05); border: 1px solid rgba(255,255,255,0.7);">
             
             <!-- Left Column: Product Gallery -->
@@ -70,12 +58,12 @@
                 <!-- Thumbnails Gallery -->
                 <div class="thumbnails-container" style="display: flex; gap: 15px; margin-top: 25px; justify-content: flex-start; overflow-x: auto; padding-bottom: 10px;">
                     <div class="thumbnail active" data-src="{{ $imageUrl }}" style="width: 85px; height: 85px; border-radius: 18px; overflow: hidden; cursor: pointer; border: 3px solid #f06292; box-shadow: 0 5px 15px rgba(240,98,146,0.15); flex-shrink: 0; transition: all 0.3s;">
-                        <img src="{{ $imageUrl }}" style="width: 100%; height: 100%; object-fit: cover;">
+                        <img src="{{ $imageUrl }}" onerror="this.parentElement.style.display='none'" style="width: 100%; height: 100%; object-fit: cover;">
                     </div>
                     @foreach($variantImages as $varName => $varImgUrl)
                         @if($varImgUrl != $imageUrl)
                             <div class="thumbnail" data-src="{{ $varImgUrl }}" style="width: 85px; height: 85px; border-radius: 18px; overflow: hidden; cursor: pointer; border: 3px solid transparent; flex-shrink: 0; transition: all 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-                                <img src="{{ $varImgUrl }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                <img src="{{ $varImgUrl }}" onerror="this.parentElement.style.display='none'" style="width: 100%; height: 100%; object-fit: cover;">
                             </div>
                         @endif
                     @endforeach
@@ -186,7 +174,7 @@
                             @endif
                         </span>
                     </div>
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;" class="cta-row">
                         @if($produk->harga > 0)
                             <button id="detailAddToCartBtn" style="flex: 1.1; padding: 18px 24px; border-radius: 50px; border: 2px solid #b2dfdb; background: #e0f2f1; color: #00695c; font-weight: 800; font-size: 15px; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 15px rgba(0,105,92,0.1);">
                                 <i class="fas fa-cart-plus" style="font-size: 17px;"></i> Masukkan Keranjang
@@ -207,8 +195,8 @@
     </div>
 
     <!-- Tabs Information Section (Shopee-Style) -->
-    <div style="max-width: 1400px; margin: 50px auto; padding: 0 25px; font-family: 'Outfit', sans-serif;">
-        <div style="background: rgba(255, 255, 255, 0.95); border-radius: 40px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.04); border: 1px solid rgba(255,255,255,0.7);">
+    <div class="detail-wrap" style="max-width: 1400px; margin: 50px auto; padding: 0 25px; font-family: 'Outfit', sans-serif;">
+        <div class="detail-card" style="background: rgba(255, 255, 255, 0.95); border-radius: 40px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.04); border: 1px solid rgba(255,255,255,0.7);">
             
             <!-- Tab Headers -->
             <div class="tabs-header-container" style="display: flex; gap: 40px; border-bottom: 2px solid #f0e0d0; margin-bottom: 35px; padding-bottom: 5px;">
@@ -227,7 +215,7 @@
                 <div style="color: #6d4c41; font-size: 16.5px; line-height: 1.8; font-weight: 600;">
                     <p style="margin-bottom: 25px;">{{ $produk->deskripsi ?: 'Nikmati hidangan manis nan premium persembahan dari Dear Seana. Setiap produk diolah secara higienis menggunakan bahan-bahan impor berkualitas tinggi untuk memanjakan lidah Anda.' }}</p>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 35px;">
+                    <div class="desc-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 35px;">
                         <div style="background: #fff8f5; border-radius: 24px; padding: 25px; border: 1px solid #ffe8e0;">
                             <h3 style="font-size: 18px; color: #6d4c41; font-weight: 800; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
                                 <span>🌾</span> Keunggulan Bahan Kami
@@ -362,8 +350,8 @@
                                 
                                 @if(!empty($rev->foto))
                                     <div style="margin-top: 12px; margin-bottom: 15px;">
-                                        <a href="{{ asset($rev->foto) }}" target="_blank">
-                                            <img src="{{ asset($rev->foto) }}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 12px; border: 2px solid #f8bbd0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                        <a href="{{ asset($rev->foto) . '?v=' . \App\Support\ImageSanitizer::version($rev->foto) }}" target="_blank">
+                                            <img src="{{ asset($rev->foto) . '?v=' . \App\Support\ImageSanitizer::version($rev->foto) }}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 12px; border: 2px solid #f8bbd0; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                                         </a>
                                     </div>
                                 @endif
@@ -392,20 +380,11 @@
                 </div>
             </div>
             
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;">
+            <div class="related-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px;">
                 @foreach($relatedProduks as $relIdx => $relProd)
                     @php
-                        if($relProd->gambar && !str_starts_with($relProd->gambar, 'http')) {
-                            if (str_starts_with($relProd->gambar, 'Kue/') || str_starts_with($relProd->gambar, 'Cookies/')) {
-                                $relImg = asset('assets/img_produk/' . ltrim($relProd->gambar, '/'));
-                            } else {
-                                $relImg = asset('storage/' . $relProd->gambar);
-                            }
-                        } elseif($relProd->gambar && str_starts_with($relProd->gambar, 'http')) {
-                            $relImg = $relProd->gambar;
-                        } else {
-                            $relImg = 'https://picsum.photos/seed/' . $relProd->id . '/300/200';
-                        }
+                        // Resolusi gambar dipusatkan di App\Support\ProdukImage
+                        $relImg = \App\Support\ProdukImage::url($relProd->gambar);
                     @endphp
                     
                     <div class="menu-card" data-aos="fade-up" data-aos-delay="{{ $relIdx * 50 }}" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px); border-radius: 28px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.06); transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); border: 1px solid rgba(255,255,255,0.6); display: flex; flex-direction: column; height: 100%;">
@@ -516,6 +495,79 @@
             background: #f06292 !important;
             color: white !important;
             transform: rotate(90deg);
+        }
+
+        /* ================= Responsif mobile ================= */
+        @media (max-width: 1024px) {
+            .product-layout { gap: 30px !important; padding: 26px !important; }
+            .main-image-container { height: 400px !important; }
+            .info-column h1 { font-size: 32px !important; }
+            #productBasePriceDisplay { font-size: 30px !important; }
+        }
+
+        @media (max-width: 860px) {
+            .detail-wrap { margin: 26px auto !important; padding: 0 16px !important; }
+            .product-layout {
+                grid-template-columns: 1fr !important;
+                gap: 26px !important;
+                padding: 18px !important;
+                border-radius: 24px !important;
+            }
+            .main-image-container { height: 320px !important; border-radius: 20px !important; }
+            .info-column h1 { font-size: 27px !important; }
+            #productBasePriceDisplay { font-size: 26px !important; }
+            #detailSubtotalDisplay { font-size: 21px !important; }
+            .desc-grid { grid-template-columns: 1fr !important; gap: 18px !important; }
+            .reviews-dashboard { grid-template-columns: 1fr !important; gap: 20px !important; padding: 20px !important; }
+            .reviews-dashboard > div:first-child {
+                border-right: 0 !important;
+                border-bottom: 2px dashed #f0d0d0;
+                padding: 0 0 18px !important;
+            }
+            .tabs-header-container { gap: 18px !important; flex-wrap: wrap; }
+            .tab-header { font-size: 16px !important; }
+            .related-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 14px !important; }
+            .review-item-card { gap: 12px !important; }
+        }
+
+        @media (max-width: 600px) {
+            .detail-wrap { margin: 18px auto !important; padding: 0 12px !important; }
+            .product-layout { padding: 14px !important; gap: 20px !important; border-radius: 20px !important; }
+            .main-image-container { height: 260px !important; }
+            .thumbnails-container { gap: 10px !important; margin-top: 14px !important; }
+            .thumbnail { width: 66px !important; height: 66px !important; border-radius: 14px !important; }
+            .info-column h1 { font-size: 23px !important; line-height: 1.25 !important; }
+            #productBasePriceDisplay { font-size: 24px !important; }
+            .detail-card { padding: 16px !important; border-radius: 22px !important; }
+            .reviews-dashboard > div:first-child > span:first-child { font-size: 44px !important; }
+            .tabs-header-container { gap: 14px !important; }
+            .tab-header { font-size: 14.5px !important; padding-bottom: 10px !important; }
+            .review-item-card { flex-direction: column !important; gap: 10px !important; }
+            .modal-content {
+                border-radius: 26px !important;
+                width: 94% !important;
+                max-height: 88vh !important;
+            }
+            .modal-header { padding: 18px !important; border-radius: 26px 26px 0 0 !important; }
+            .modal-body { padding: 18px !important; }
+            .modal-footer { padding: 16px 18px 20px !important; border-radius: 0 0 26px 26px !important; }
+            .cta-row { gap: 10px !important; }
+            .cta-row > button, .cta-row > a {
+                flex: 1 1 100% !important;
+                padding: 15px 16px !important;
+                font-size: 14.5px !important;
+            }
+            .floating-cart {
+                width: 58px !important; height: 58px !important;
+                font-size: 24px !important; bottom: 20px !important; right: 20px !important;
+            }
+            #toastNotification {
+                white-space: normal !important;
+                max-width: calc(100vw - 28px);
+                text-align: center;
+                border-radius: 24px !important;
+                padding: 14px 20px !important;
+            }
         }
 
         @keyframes fadeIn {

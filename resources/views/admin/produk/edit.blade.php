@@ -45,7 +45,7 @@
                 <label class="form-label">Foto Produk Baru (Biarkan kosong jika tidak ingin mengubah)</label>
                 @if($produk->gambar)
                     <div style="margin-bottom: 10px;">
-                        <img src="{{ asset('storage/' . $produk->gambar) }}" width="100" style="border-radius: 8px; border: 2px solid var(--border-color);">
+                        <img src="{{ \App\Support\ProdukImage::url($produk->gambar) }}" alt="{{ $produk->nama_produk }}" width="100" style="border-radius: 8px; border: 2px solid var(--border-color); background: #fdeef3;">
                     </div>
                 @endif
                 <input type="file" name="gambar" class="form-control" style="padding: 9px 16px;">

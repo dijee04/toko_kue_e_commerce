@@ -85,20 +85,8 @@
                         <div class="menu-grid stagger scroll-reveal" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 30px;">
                             @foreach($items as $index => $produk)
                                 @php
-                                    if($produk->gambar && !str_starts_with($produk->gambar, 'http')) {
-                                        if (str_starts_with($produk->gambar, 'assets/')) {
-                                            // Path sudah lengkap relatif terhadap public/
-                                            $imageUrl = asset($produk->gambar);
-                                        } elseif (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/')) {
-                                            $imageUrl = asset('assets/img_produk/' . ltrim($produk->gambar, '/'));
-                                        } else {
-                                            $imageUrl = asset('storage/' . $produk->gambar);
-                                        }
-                                    } elseif($produk->gambar && str_starts_with($produk->gambar, 'http')) {
-                                        $imageUrl = $produk->gambar;
-                                    } else {
-                                        $imageUrl = 'https://picsum.photos/seed/' . $produk->id . '/300/200';
-                                    }
+                                    // Resolusi gambar dipusatkan di App\Support\ProdukImage
+                                    $imageUrl = \App\Support\ProdukImage::url($produk->gambar);
                                     
                                     // Aturan opsi dipusatkan di App\Support\ProdukOptions
                                     // agar harga yang dihitung server sama dengan yang tampil.
@@ -563,10 +551,12 @@
             .payment-option { min-width: 90px !important; padding: 10px !important; }
             .payment-icon { font-size: 24px !important; }
         }
+        @media (max-width: 600px) {
+            .floating-cart { width: 58px !important; height: 58px !important; font-size: 24px !important; bottom: 20px !important; right: 20px !important; }
+        }
         @media (max-width: 480px) { 
             .menu-grid { grid-template-columns: 1fr !important; }
             .menu-card { max-width: 350px; margin: 0 auto; }
-            .floating-cart { width: 55px; height: 55px; font-size: 24px; bottom: 20px; right: 20px; }
             .modal-footer #modalTotalPrice { font-size: 24px !important; }
         }
         

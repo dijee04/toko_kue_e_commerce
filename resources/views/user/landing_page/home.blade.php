@@ -98,14 +98,8 @@
             <div class="promise-right gallery-grid" style="flex: 1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
                 @foreach($produks->where('harga', '>', 0)->take(4) as $produk)
                 @php
-                    // Check if image is from storage or assets
-                    if ($produk->gambar && str_starts_with($produk->gambar, 'assets/')) {
-                        $imgUrl = asset($produk->gambar);
-                    } elseif ($produk->gambar && (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/'))) {
-                        $imgUrl = asset('assets/img_produk/' . $produk->gambar);
-                    } else {
-                        $imgUrl = $produk->gambar ? asset('storage/' . $produk->gambar) : 'https://picsum.photos/seed/'.$produk->id.'/300/300';
-                    }
+                    // Resolusi gambar dipusatkan di App\Support\ProdukImage
+                    $imgUrl = \App\Support\ProdukImage::url($produk->gambar);
                 @endphp
                 <div class="gal-item" data-product="{{ $produk->nama_produk }}" data-price="Rp {{ number_format($produk->harga, 0, ',', '.') }}" data-desc="{{ $produk->deskripsi }}" data-img="{{ $imgUrl }}">
                     <img src="{{ $imgUrl }}" alt="{{ $produk->nama_produk }}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s;">
@@ -403,13 +397,8 @@
         const galleryProducts = [
             @foreach($produks->where('harga', '>', 0)->take(4) as $produk)
             @php
-                if ($produk->gambar && str_starts_with($produk->gambar, 'assets/')) {
-                    $imgUrl = asset($produk->gambar);
-                } elseif ($produk->gambar && (str_starts_with($produk->gambar, 'Kue/') || str_starts_with($produk->gambar, 'Cookies/'))) {
-                    $imgUrl = asset('assets/img_produk/' . $produk->gambar);
-                } else {
-                    $imgUrl = $produk->gambar ? asset('storage/' . $produk->gambar) : 'https://picsum.photos/seed/'.$produk->id.'/300/300';
-                }
+                // Resolusi gambar dipusatkan di App\Support\ProdukImage
+                $imgUrl = \App\Support\ProdukImage::url($produk->gambar);
                 $priceFormatted = 'Rp ' . number_format($produk->harga, 0, ',', '.');
             @endphp
             {

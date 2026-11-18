@@ -226,8 +226,8 @@
                                             📸 Bukti Pengiriman Kurir
                                         </div>
                                         <div style="font-size: 13px; color: #558b2f; font-weight: 600; margin-top: -4px;">Pesanan Anda telah diantarkan oleh kurir kami:</div>
-                                        <a href="{{ asset($order->bukti_pengiriman) }}" target="_blank" style="align-self: flex-start;">
-                                            <img src="{{ asset($order->bukti_pengiriman) }}" style="width: 150px; height: 150px; object-fit: cover; border-radius: 12px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                        <a href="{{ asset($order->bukti_pengiriman) . '?v=' . \App\Support\ImageSanitizer::version($order->bukti_pengiriman) }}" target="_blank" style="align-self: flex-start;">
+                                            <img src="{{ asset($order->bukti_pengiriman) . '?v=' . \App\Support\ImageSanitizer::version($order->bukti_pengiriman) }}" style="width: 150px; height: 150px; object-fit: cover; border-radius: 12px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                                         </a>
                                     </div>
                                 @endif
@@ -254,8 +254,8 @@
                                                     </div>
                                                     <div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
                                                         @if($review->foto)
-                                                            <a href="{{ asset($review->foto) }}" target="_blank">
-                                                                <img src="{{ asset($review->foto) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                                            <a href="{{ asset($review->foto) . '?v=' . \App\Support\ImageSanitizer::version($review->foto) }}" target="_blank">
+                                                                <img src="{{ asset($review->foto) . '?v=' . \App\Support\ImageSanitizer::version($review->foto) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                                                             </a>
                                                         @endif
                                                         <div style="flex: 1; font-style: italic; color: #8d6e63; font-size: 14px; background: white; padding: 10px; border-radius: 8px; border-left: 4px solid #f06292; min-height: 40px; display: flex; align-items: center;">
@@ -383,8 +383,8 @@
                                             📸 Bukti Pengiriman Kurir
                                         </div>
                                         <div style="font-size: 13px; color: #558b2f; font-weight: 600; margin-top: -4px;">Pesanan Anda telah diantarkan oleh kurir kami:</div>
-                                        <a href="{{ asset($order->bukti_pengiriman) }}" target="_blank" style="align-self: flex-start;">
-                                            <img src="{{ asset($order->bukti_pengiriman) }}" style="width: 150px; height: 150px; object-fit: cover; border-radius: 12px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                        <a href="{{ asset($order->bukti_pengiriman) . '?v=' . \App\Support\ImageSanitizer::version($order->bukti_pengiriman) }}" target="_blank" style="align-self: flex-start;">
+                                            <img src="{{ asset($order->bukti_pengiriman) . '?v=' . \App\Support\ImageSanitizer::version($order->bukti_pengiriman) }}" style="width: 150px; height: 150px; object-fit: cover; border-radius: 12px; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                                         </a>
                                     </div>
                                 @endif
@@ -397,8 +397,8 @@
                                         </div>
                                         <div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
                                             @if($review->foto)
-                                                <a href="{{ asset($review->foto) }}" target="_blank">
-                                                    <img src="{{ asset($review->foto) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                                <a href="{{ asset($review->foto) . '?v=' . \App\Support\ImageSanitizer::version($review->foto) }}" target="_blank">
+                                                    <img src="{{ asset($review->foto) . '?v=' . \App\Support\ImageSanitizer::version($review->foto) }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 12px; border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
                                                 </a>
                                             @endif
                                             <div style="flex: 1; font-style: italic; color: #8d6e63; font-size: 14px; background: white; padding: 10px; border-radius: 8px; border-left: 4px solid #f06292; min-height: 40px; display: flex; align-items: center;">

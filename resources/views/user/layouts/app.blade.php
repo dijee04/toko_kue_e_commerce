@@ -149,6 +149,9 @@
 <body>
     <!-- Topbar -->
     <div class="topbar container">
+        <button type="button" class="nav-expand" id="navExpandBtn" aria-label="Tampilkan menu lengkap" title="Tampilkan menu lengkap">
+            <i class="fas fa-chevron-right"></i>
+        </button>
         <div class="logo-container">
             <div class="logo-sweet">SWEET & SAVORY</div>
             <a href="/" class="logo-group">
@@ -163,14 +166,14 @@
         </div>
         <div class="topbar-right" style="gap: 2rem;">
             <ul class="nav-links">
-                <li><a href="{{ route('beranda') }}">Home</a></li>
-                <li><a href="{{ route('menu') }}">Menu</a></li>
-                <li><a href="{{ route('our_story') }}">Our Story</a></li>
+                <li><a href="{{ route('beranda') }}" title="Home"><i class="fas fa-home"></i><span class="nav-label">Home</span></a></li>
+                <li><a href="{{ route('menu') }}" title="Menu"><i class="fas fa-utensils"></i><span class="nav-label">Menu</span></a></li>
+                <li><a href="{{ route('our_story') }}" title="Our Story"><i class="fas fa-heart"></i><span class="nav-label">Our Story</span></a></li>
                 @auth
-                    <li><a href="{{ route('pesanan_saya') }}" style="color: #f06292; font-weight: 700;"><i class="fas fa-shopping-bag"></i> Pesanan Saya</a></li>
-                    <li style="margin-left: 10px; padding-left: 10px; border-left: 1px solid #eee;">
-                        <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" style="color: #c45b74 !important; font-weight: 700;">
-                            <i class="fas fa-sign-out-alt"></i> Keluar
+                    <li><a href="{{ route('pesanan_saya') }}" title="Pesanan Saya" style="color: #f06292; font-weight: 700;"><i class="fas fa-shopping-bag"></i><span class="nav-label">Pesanan Saya</span></a></li>
+                    <li class="nav-logout" style="margin-left: 10px; padding-left: 10px; border-left: 1px solid #eee;">
+                        <a href="#" title="Keluar" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" style="color: #c45b74 !important; font-weight: 700;">
+                            <i class="fas fa-sign-out-alt"></i><span class="nav-label">Keluar</span>
                         </a>
                         <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
                             @csrf
@@ -203,15 +206,15 @@
                 @endauth
 
                 @guest
-                    <a href="{{ route('login') }}" style="display:flex; align-items:center; gap:8px; padding: 10px 16px; border-radius: 12px; background: #fce4ec; color: #f06292; font-weight: 700; font-size: 0.9rem; text-decoration: none; border: 1px solid #f8bbd0; transition: all 0.2s;">
-                        <i class="fas fa-sign-in-alt"></i> Masuk
+                    <a href="{{ route('login') }}" title="Masuk" style="display:flex; align-items:center; gap:8px; padding: 10px 16px; border-radius: 12px; background: #fce4ec; color: #f06292; font-weight: 700; font-size: 0.9rem; text-decoration: none; border: 1px solid #f8bbd0; transition: all 0.2s;">
+                        <i class="fas fa-sign-in-alt"></i><span class="nav-label">Masuk</span>
                     </a>
                 @endguest
 
                 <!-- Tombol Pesan Sekarang -->
                 <a href="https://wa.me/{{ $global_setting->wa_number ?? '6281234567890' }}?text=Halo%20Dear%20Seana,%20saya%20tertarik%20dengan%20koleksi%20kue%20Anda."
-                    target="_blank" class="btn-pesan" style="display:flex; align-items:center; gap:8px;"><i
-                        class="fab fa-whatsapp" style="font-size:1.1rem;"></i> Pesan Sekarang</a>
+                    target="_blank" class="btn-pesan" title="Pesan Sekarang" style="display:flex; align-items:center; gap:8px;"><i
+                        class="fab fa-whatsapp" style="font-size:1.1rem;"></i><span class="nav-label">Pesan Sekarang</span></a>
             </div>
         </div>
     </div>
@@ -666,12 +669,18 @@
 
                 if (!res.ok) throw new Error('HTTP ' + res.status);
 
+                const contentType = res.headers.get('content-type') || '';
+                if (contentType.indexOf('application/json') === -1) {
+                    throw new Error('Respons bukan JSON');
+                }
+
                 const data = await res.json();
                 typing.remove();
                 addMessage(data.reply || 'Maaf, saya belum bisa menjawab saat ini.', 'bot');
                 renderChips(data.quick_replies || []);
             } catch (err) {
                 typing.remove();
+                if (window.console && console.warn) console.warn('Chatbot gagal:', err && err.message);
                 addMessage('Koneksi sedang bermasalah. Coba lagi sebentar, atau hubungi admin lewat WhatsApp.', 'bot');
             } finally {
                 busy = false;
@@ -726,15 +735,64 @@
     })();
     </script>
 
-    {{-- Navbar floating pill: bayangan lebih tegas saat halaman di-scroll. --}}
+    {{-- Navbar floating pill: bayangan saat halaman di-scroll, mengecil jadi
+         ikon saja ketika scroll ke bawah, dan melebar lagi ketika diklik. --}}
     <script>
     (function () {
         var bar = document.querySelector('.topbar');
         if (!bar) return;
 
-        function sync() {
-            bar.classList.toggle('topbar-scrolled', window.scrollY > 8);
+        var expandBtn = document.getElementById('navExpandBtn');
+        var lastY = window.scrollY;
+        var expandedByUser = false;
+        var expandedAtY = 0;
+
+        function apply(collapsed) {
+            bar.classList.toggle('is-collapsed', collapsed);
         }
+
+        function sync() {
+            var y = window.scrollY;
+
+            // Kembali ke paling atas: navbar selalu penuh lagi.
+            if (y <= 60) {
+                expandedByUser = false;
+                apply(false);
+            } else if (expandedByUser && y - expandedAtY > 150) {
+                // Setelah dibuka user, biarkan terbuka sampai ia lanjut scroll
+                // cukup jauh, baru boleh mengecil lagi.
+                expandedByUser = false;
+            }
+
+            // Hanya mengecil saat scroll ke bawah — tidak pernah membuka sendiri,
+            // supaya tidak terjadi buka-tutup berulang (oscillation).
+            if (!expandedByUser && y > 200 && y > lastY) {
+                apply(true);
+            }
+
+            bar.classList.toggle('topbar-scrolled', y > 8);
+
+            lastY = y;
+        }
+
+        function expand(e) {
+            if (!bar.classList.contains('is-collapsed')) return;
+            if (e) e.preventDefault();
+            expandedByUser = true;
+            expandedAtY = window.scrollY;
+            apply(false);
+            lastY = window.scrollY;
+        }
+
+        if (expandBtn) {
+            expandBtn.addEventListener('click', expand);
+        }
+
+        // Klik area kosong navbar juga melebarkannya kembali.
+        bar.addEventListener('click', function (e) {
+            if (e.target.closest('a, ul, .nav-links, .btn-pesan')) return;
+            expand(e);
+        });
 
         sync();
         window.addEventListener('scroll', sync, { passive: true });

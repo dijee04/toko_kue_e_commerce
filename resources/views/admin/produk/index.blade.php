@@ -30,13 +30,7 @@
                     @forelse($produks as $produk)
                         <tr>
                             <td>
-                                @if($produk->gambar)
-                                    <img src="{{ asset('storage/' . $produk->gambar) }}" width="60" height="60" style="object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                                @else
-                                    <div style="width: 60px; height: 60px; background: #eee; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">
-                                        <i class="fas fa-image"></i>
-                                    </div>
-                                @endif
+                                <img src="{{ \App\Support\ProdukImage::url($produk->gambar) }}" alt="{{ $produk->nama_produk }}" width="60" height="60" style="object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: #fdeef3;">
                             </td>
                             <td style="font-weight: 600;">{{ $produk->nama_produk }}</td>
                             <td>

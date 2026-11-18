@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Kurir;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 
 class DashboardController extends Controller
 {
@@ -80,16 +79,10 @@ class DashboardController extends Controller
         ]);
 
         if ($request->hasFile('bukti_pengiriman')) {
-            $file = $request->file('bukti_pengiriman');
-            $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-
-            $destinationPath = public_path('uploads/bukti_pengiriman');
-            if (!File::exists($destinationPath)) {
-                File::makeDirectory($destinationPath, 0755, true, true);
-            }
-
-            $file->move($destinationPath, $filename);
-            $fotoPath = 'uploads/bukti_pengiriman/' . $filename;
+            // Simpan ke storage/app/public agar tetap bisa diakses pada hosting
+            // yang document root-nya bukan folder public/ Laravel.
+            $fotoPath = $request->file('bukti_pengiriman')->store('uploads/bukti_pengiriman', 'public');
+            \App\Support\ImageSanitizer::stripBom($fotoPath);
 
             $order->update([
                 'status' => 'selesai',

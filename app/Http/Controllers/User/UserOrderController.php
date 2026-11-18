@@ -122,13 +122,10 @@ class UserOrderController extends Controller
 
         $fotoPath = null;
         if ($request->hasFile('foto')) {
-            $file = $request->file('foto');
-            $filename = $file->hashName();
-            if (!file_exists(public_path('uploads/reviews'))) {
-                mkdir(public_path('uploads/reviews'), 0755, true);
-            }
-            $file->move(public_path('uploads/reviews'), $filename);
-            $fotoPath = 'uploads/reviews/' . $filename;
+            // Simpan ke storage/app/public agar tetap bisa diakses pada hosting
+            // yang document root-nya bukan folder public/ Laravel.
+            $fotoPath = $request->file('foto')->store('uploads/reviews', 'public');
+            \App\Support\ImageSanitizer::stripBom($fotoPath);
         }
 
         Review::create([

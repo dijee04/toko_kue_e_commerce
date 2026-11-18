@@ -17,7 +17,8 @@ Route::get('/menu/{id}', [HomeController::class, 'show'])->name('menu.show');
 Route::get('/our-story', [HomeController::class, 'ourStory'])->name('our_story');
 
 // Chatbot penjualan (rule-based, boleh diakses tanpa login).
-Route::post('/chatbot', [\App\Http\Controllers\ChatbotController::class, 'reply'])
+// CATATAN: jangan pakai path yang mengandung "chat" — InfinityFree memblokirnya (403).
+Route::post('/asisten', [\App\Http\Controllers\ChatbotController::class, 'reply'])
     ->middleware('throttle:40,1')
     ->name('chatbot.reply');
 
@@ -30,8 +31,29 @@ Route::get('/storage/{path}', function (string $path) {
 
     abort_unless($base && $file && str_starts_with($file, $base) && is_file($file), 404);
 
-    return response()->file($file);
+    return \App\Support\ImageSanitizer::respond($file);
 })->where('path', '.*')->name('storage.public');
+
+// Sajikan foto unggahan (ulasan & bukti pengiriman) walau document root
+// hosting bukan folder public/ Laravel. File lama di public/uploads tetap dilayani.
+Route::get('/uploads/{path}', function (string $path) {
+    abort_if(str_contains($path, '..'), 404);
+
+    $candidates = [
+        storage_path('app/public/uploads/' . $path),
+        public_path('uploads/' . $path),
+    ];
+
+    foreach ($candidates as $candidate) {
+        $file = realpath($candidate);
+
+        if ($file && is_file($file)) {
+            return \App\Support\ImageSanitizer::respond($file);
+        }
+    }
+
+    abort(404);
+})->where('path', '.*')->name('uploads.public');
 
 /*
 |--------------------------------------------------------------------------

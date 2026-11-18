@@ -344,8 +344,8 @@
                             <div class="info-group">
                                 <span class="info-label">Bukti Pengiriman</span>
                                 @if($order->bukti_pengiriman)
-                                    <a href="{{ asset($order->bukti_pengiriman) }}" target="_blank">
-                                        <img src="{{ asset($order->bukti_pengiriman) }}" class="proof-img" alt="Bukti">
+                                    <a href="{{ asset($order->bukti_pengiriman) . '?v=' . \App\Support\ImageSanitizer::version($order->bukti_pengiriman) }}" target="_blank">
+                                        <img src="{{ asset($order->bukti_pengiriman) . '?v=' . \App\Support\ImageSanitizer::version($order->bukti_pengiriman) }}" class="proof-img" alt="Bukti">
                                     </a>
                                 @else
                                     <span class="info-value" style="color: red;">Tidak ada foto</span>

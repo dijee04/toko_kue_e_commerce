@@ -313,8 +313,8 @@
                 @if($review->foto)
                     <div>
                         <strong style="display: block; font-size: 13.5px; color: #6d4c41; margin-bottom: 8px;"><i class="fas fa-image"></i> Foto Kue dari Pelanggan:</strong>
-                        <a href="{{ asset($review->foto) }}" target="_blank">
-                            <img src="{{ asset($review->foto) }}" style="width: 140px; height: 140px; object-fit: cover; border-radius: 14px; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                        <a href="{{ asset($review->foto) . '?v=' . \App\Support\ImageSanitizer::version($review->foto) }}" target="_blank">
+                            <img src="{{ asset($review->foto) . '?v=' . \App\Support\ImageSanitizer::version($review->foto) }}" style="width: 140px; height: 140px; object-fit: cover; border-radius: 14px; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.08); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
                         </a>
                     </div>
                 @endif

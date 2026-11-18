@@ -548,3 +548,148 @@ pembayaran, cara pesan, stok, custom cake, hampers, katalog, dimsum, fallback);
   `resources/views/user/landing_page/katering.blade.php` dihapus.
 - Verifikasi: `/`, `/menu`, `/menu/6`, `/our-story` = 200; `/katering` = 404;
   HTML `/menu` tidak lagi memuat tautan Katering; `php -l` OK.
+## Foto ulasan & bukti pengiriman di hosting (16 Nov 2026)
+
+- Masalah: foto ulasan di /menu/9 tampil kotak kosong dan saat diklik
+  menghasilkan halaman 404 Laravel (/uploads/reviews/<hash>.jpg).
+- Akar: di InfinityFree document root adalah htdocs sedangkan Laravel ada
+  di htdocs/laravel, sehingga public_path() (= htdocs/laravel/public)
+  tidak dilayani web. Foto lama disimpan ke public_path('uploads/reviews').
+- Perbaikan:
+  1. Upload foto ulasan dan bukti pengiriman sekarang memakai disk public:
+     store('uploads/reviews', 'public') dan
+     store('uploads/bukti_pengiriman', 'public') (ke storage/app/public).
+  2. Route GET /uploads/{path} (name uploads.public) ditambahkan sebagai
+     fallback: melayani file dari storage/app/public/uploads/<path>, lalu
+     public/uploads/<path> (untuk file lama). Path traversal .. ditolak.
+  3. URL foto diberi cache-buster ?v=<updated_at> di detail produk,
+     pesanan saya, admin order, dan riwayat kurir supaya browser tidak
+     memakai cache 404 lama ketika file sudah tersedia.
+- Verifikasi: php artisan route:list --path=uploads menampilkan route;
+  /uploads/reviews/<file> = 200 dengan content-type image/jpeg (diuji dari
+  luar hosting), file tidak ada = 404, /uploads/../.env = 404.
+### Akar sebenarnya: file JPEG berawalan BOM
+
+- Setelah route uploads.public aktif, URL foto tetap tampil rusak di browser
+  padahal server membalas 200 OK, Content-Type: image/jpeg, ukuran 90.344 B.
+- Penyebab: 3 byte pertama file adalah EF BB BF (UTF-8 BOM) sebelum
+  FF D8 FF. Browser menolak men-decode JPEG yang diawali BOM, sedangkan
+  curl/unduhan tetap "berhasil" sehingga gejalanya menyesatkan.
+- Perbaikan: app/Support/ImageSanitizer::stripBom() membuang BOM bila ada,
+  dipanggil setelah upload foto ulasan dan bukti pengiriman. File lama
+  diperbaiki sekali secara manual (90.344 B -> 90.341 B).
+
+## Chatbot gagal di hosting: path "chatbot" diblokir InfinityFree (18 Nov 2026)
+
+- Gejala: widget chat menjawab "Koneksi sedang bermasalah. Coba lagi
+  sebentar..." di `/menu`.
+- Investigasi: `POST /chatbot` tidak pernah sampai ke Laravel. Server membalas
+  `302` -> `https://errors.infinityfree.net/errors/403/` ("403 Forbidden -
+  Server or website configuration is blocking you from viewing this page"),
+  sehingga `fetch` gagal karena kebijakan CORS.
+- Uji pembanding: `POST /login` berhasil (`302` -> `/menu`), `POST /tanya` dan
+  `POST /kontak` sampai ke Laravel (404 dari Laravel), tetapi `POST /chatbot`,
+  `/chatbot2`, `/chat` dan `/chat-api` semuanya 403 dari InfinityFree. Jadi
+  filter hosting memblokir URL yang mengandung kata "chat", bukan bug aplikasi.
+- Perbaikan: route diubah `POST /chatbot` -> `POST /asisten` (nama route tetap
+  `chatbot.reply`); widget memakai `route()` sehingga otomatis mengikuti.
+  Aturan: jangan memakai nama URL ber-"chat" di hosting ini.
+- Verifikasi lokal: `POST /asisten` -> 200 JSON; HTML `/menu` memuat endpoint
+  `/asisten` dan tidak lagi memuat `/chatbot`.
+- Paket deploy: `deploy-infinityfree/update-2026-11-18/` (routes/web.php,
+  layouts/app.blade.php, landing_page/detail.blade.php, ImageSanitizer.php,
+  2 controller, serta `htdocs/clear-cache.php` + README).
+## Navbar mengecil saat scroll (18 Nov 2026)
+
+- Permintaan: navbar mengecil menjadi ikon saja saat halaman di-scroll ke bawah,
+  dan melebar lagi ketika diklik.
+- Perubahan `resources/views/user/layouts/app.blade.php`: tombol
+  `#navExpandBtn` (chevron), setiap link nav memakai `<i>` + `<span class="nav-label">`,
+  li logout diberi `class="nav-logout"`, dan script pengatur state
+  (`apply/sync/expand`, `expandedByUser`, `expandedAtY`, `lastY`).
+- Perubahan `public/assets/user/css/style.css`: `.nav-expand`, state
+  `.topbar.is-collapsed` (`width: fit-content`, ikon saja, logo/label/logout
+  disembunyikan), `html { overflow-anchor: none; }` agar tinggi navbar berubah
+  tanpa menggeser posisi scroll, plus penyesuaian 768px/480px.
+- Catatan penting: `.topbar` pada `@media (max-width: 768px)` memakai
+  `flex-direction: column`; state collapsed harus mengembalikannya ke `row`
+  (dan `.topbar-right` juga) agar tetap satu baris.
+- Logika: hanya mengecil saat scroll ke bawah (`y > 200 && y > lastY`), tidak
+  pernah membuka sendiri (mencegah osilasi), melebar saat tombol/area navbar
+  diklik, kembali penuh di `y <= 60`, dan boleh mengecil lagi setelah user
+  lanjut scroll > 150px dari titik ia membuka.
+- Verifikasi (Chrome headless 1365px dan 390px, guest dan login): desktop
+  1200x78 -> 276x54 (guest) / 348x56 (login) -> melebar 1200x78 saat diklik;
+  mobile 370x190 -> 246x52 (guest) / 300x48 (login) satu baris. `node --check`
+  seluruh script inline = 0 error, brace CSS seimbang (396/396), `view:cache` OK.
+
+## Tombol keranjang & chatbot diberi jarak (18 Nov 2026)
+
+- Gejala: tombol keranjang mengambang (`.floating-cart`, 70px, `bottom:30px`)
+  dan tombol chat (`.chat-fab`, 58px, `bottom:112px`) hanya berjarak 12px
+  sehingga bayangan keduanya saling menempel.
+- Perbaikan `public/assets/user/css/style.css`: `.chat-widget.chat-above-cart`
+  `bottom: 122px`; `@media (max-width:600px)` -> `.chat-widget { right:20px }`
+  dan `.chat-widget.chat-above-cart { bottom: 100px }`.
+- Perbaikan `resources/views/user/landing_page/menu.blade.php`: tombol keranjang
+  ikut mengecil (`58px`, `bottom/right: 20px`) mulai lebar 600px (sebelumnya
+  baru di 480px dan tanpa `!important`), disamakan dengan halaman detail;
+  `detail.blade.php` `right: 18px` -> `20px`.
+- Hasil ukur (puppeteer, /menu dan /menu/6 pada 1365/992/768/600/500/390px):
+  jarak vertikal kartu-chat konsisten **22-23px**, selisih posisi kanan **0px**
+  (sebelumnya 11-12px dan bergeser 10px di 600px).
+
+## Thumbnail produk patah di halaman admin (18 Nov 2026)
+
+- Gejala: seluruh thumbnail di `/admin/produk` tampil sebagai ikon gambar pecah,
+  padahal file gambarnya ada di server.
+- Akar: `resources/views/admin/produk/index.blade.php:34` dan `edit.blade.php:48`
+  memakai `asset('storage/' . $produk->gambar)`, sedangkan `produks.gambar`
+  menyimpan 3 format berbeda: `Kue/chocolate_cake.png` (relatif ke
+  `assets/img_produk/`), `produk/xxxx.jpg` (upload di `storage/app/public/`),
+  dan `assets/img_produk/Cookies/Nastar_Cookies.png` (path lengkap). Selain itu
+  tiap view storefront menebak sendiri dengan `if/elseif` yang tidak seragam.
+- Perbaikan: helper baru `app/Support/ProdukImage.php` (`url()`, `candidates()`,
+  `placeholder()`), dipakai di `admin/produk/index.blade.php`,
+  `admin/produk/edit.blade.php`, `user/landing_page/menu.blade.php`,
+  `user/landing_page/detail.blade.php` (produk utama + produk terkait), dan
+  `user/landing_page/home.blade.php` (2 tempat). Helper mengecek keberadaan file,
+  meng-encode spasi pada nama file (`Whole%20Cakes/...`), dan mengembalikan
+  placeholder SVG bila file benar-benar tidak ada.
+- Verifikasi: `/admin/produk` (halaman 1 dan 2) 13/13 + 13/13 thumbnail 200
+  `image/png`; `/menu` 22/22, `/menu/6` 5/5, `/` 7/7 gambar 200; tanpa
+  placeholder yang terpakai; `view:cache` OK.
+
+## Foto ulasan & bukti pengiriman rusak di hosting — akar sebenarnya (18 Nov 2026)
+
+- Gejala: foto ulasan dan bukti pengiriman tampil sebagai kotak rusak di
+  `https://dearseana.great-site.net`, padahal file ada di server, URL
+  mengembalikan `200 image/jpeg`, dan ukuran file benar.
+- Diagnosis berlapis yang MENYESATKAN (jangan diulang):
+  1. `public_path()` = `htdocs/laravel/public` memang tidak dilayani web,
+     jadi upload dipindah ke `store(..., 'public')` + route `GET /uploads/{path}`
+     dan `GET /storage/{path}`. Perbaikan ini benar, tetapi belum menyelesaikan
+     gejala.
+  2. File di disk ternyata berawalan UTF-8 BOM (`EF BB BF`) sebelum `FF D8 FF`.
+     `App\Support\ImageSanitizer::stripBom()` ditambahkan, file lama dibersihkan,
+     tetap belum menyelesaikan gejala.
+- Akar sesungguhnya: **response dari hosting diawali BOM untuk SEMUA request**,
+  termasuk halaman error HTML (`EF BB BF 3C 21 44 4F 43` = BOM + `<!DOC`).
+  Berarti BOM disuntikkan oleh file PHP ber-BOM di hosting (byte dari file itu
+  tercetak sebelum output lain), bukan oleh file gambar. Karena itu
+  `response()->file()` maupun `ImageSanitizer::respond()` tidak bisa menolong:
+  byte BOM menempel di luar kendali controller.
+- Perbaikan: `deploy-infinityfree/update-2026-11-18/fix-php-bom.php` — memindai
+  seluruh docroot untuk `*.php`/`*.phtml` ber-BOM, mencadangkan ke `_bom_backup/`,
+  lalu membuang 3 byte pertama. Idempoten (dijalankan ulang = 0 file).
+- Pendukung: `fix-images.php` (membersihkan BOM pada gambar yang terlanjur
+  di-upload) dan `clear-cache.php` (view/route/config cache).
+- Pencegahan regresi: `App\Support\ImageSanitizer::stripBom()` tetap dipanggil
+  setiap upload foto ulasan & bukti pengiriman.
+- Cache browser: URL gambar kini memakai penanda waktu file
+  (`App\Support\ImageSanitizer::version()` dan `ProdukImage::toUrl()`),
+  bukan `updated_at` baris database, supaya perubahan isi file langsung
+  menghasilkan URL baru (tanpa perlu hard refresh).
+- Verifikasi live (Chrome headless, `cache: 'no-store'`): byte awal gambar
+  `FF D8 FF`, foto ulasan ter-decode 1080x1023, foto produk ter-decode 431x539,
+  halaman HTML diawali `<html`. Tidak ada BOM di seluruh response.
